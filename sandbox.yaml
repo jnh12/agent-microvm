@@ -1,0 +1,31 @@
+# agent-sandbox-os infrastructure config (sandbox.yaml).
+# Each resource is reuse-or-create: set an existing id/arn to reuse it, or leave
+# it empty to have `asb infra up` create it.
+
+project: agent-sandbox-os
+stack: dev
+region: us-east-1
+
+image:
+  name: agent-sandbox-guest
+  guest_dir: ./guest            # zipped -> S3 -> create_microvm_image
+  base_image_arn: ""            # empty -> newest managed base image (e.g. al2023)
+  base_image_version: ""        # optional
+
+role:
+  arn: ""                       # set -> reuse; empty -> create
+  name: agent-sandbox-exec
+  extra_policy_arns: []         # optional managed policy ARNs to attach
+
+bucket:
+  name: ""                      # set -> reuse; empty -> create
+
+network:                        # OPTIONAL. Omit entirely for default public egress.
+  egress:                       # VPC egress network connector (reuse-or-create).
+    connector_arn: ""           # set -> reuse; empty -> create a VPC_EGRESS connector
+    name: agent-sandbox-egress  # name for the created connector (+ SG)
+    vpc_id: ""                  # empty -> default VPC
+    subnet_ids: []              # subnet ids or Name tags; empty -> discover in VPC
+    security_group_id: ""       # set -> reuse; empty -> create egress-only SG
+    operator_role_arn: ""       # set -> reuse; empty -> create NetworkConnectorOperatorRole
+  # Note: VPC_EGRESS replaces public egress; add a NAT gateway for internet + VPC.

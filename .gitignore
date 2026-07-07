@@ -22,3 +22,4 @@ uv.lock
 .pytest_cache/
 
 .cursor
+.claude

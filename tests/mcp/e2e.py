@@ -5,7 +5,7 @@ Runs the server over stdio and drives a realistic flow: runtime check, an
 ephemeral ``sandbox_run``, then a persistent create -> write -> read -> shell ->
 remove cycle.
 
-    AGENT_SANDBOX_MCP_E2E=1 uv run python mcp/tests/e2e.py
+    AGENT_SANDBOX_MCP_E2E=1 uv run python tests/mcp/e2e.py
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ import sys
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
-SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def _envelope(result) -> dict:
@@ -43,7 +41,7 @@ async def main() -> None:
     params = StdioServerParameters(
         command=sys.executable,
         args=["-m", "agent_sandbox_mcp"],
-        env={**os.environ, "PYTHONPATH": SRC},
+        env=os.environ,
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:

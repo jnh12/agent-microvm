@@ -915,25 +915,15 @@ def mcp() -> None:
 
         claude mcp add agent-sandbox -- asb mcp
     """
-    import sys
-    from pathlib import Path
-
     try:
         from agent_sandbox_mcp.server import main as _mcp_main
     except ImportError:
-        # Source-checkout fallback: add <repo>/mcp/src to sys.path.
-        src = Path(__file__).resolve().parents[3] / "mcp" / "src"
-        if src.is_dir():
-            sys.path.insert(0, str(src))
-        try:
-            from agent_sandbox_mcp.server import main as _mcp_main
-        except ImportError:
-            _fail(
-                "MCP server not available. Install it with "
-                "`pip install ./mcp` (or `uv pip install ./mcp`), which pulls in "
-                "the `mcp` package."
-            )
-            return
+        _fail(
+            "MCP server not available. Install the `mcp` extra with "
+            r"`pip install agent-sandbox-os\[mcp]` (or `uv pip install -e '.\[mcp]'` "
+            "in a source checkout)."
+        )
+        return
     _mcp_main()
 
 

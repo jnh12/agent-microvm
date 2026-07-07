@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 from agent_sandbox.errors import SandboxError
-
 from agent_sandbox_mcp.session import resolve_egress_connectors
 
 

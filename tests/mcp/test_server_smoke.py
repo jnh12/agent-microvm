@@ -15,8 +15,6 @@ import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
-
 EXPECTED_TOOLS = {
     "runtime_check",
     "runtime_install",
@@ -63,9 +61,8 @@ EXPECTED_RESOURCES = {
 
 
 async def _drive() -> tuple[set[str], set[str]]:
-    env = {**os.environ, "PYTHONPATH": SRC}
     params = StdioServerParameters(
-        command=sys.executable, args=["-m", "agent_sandbox_mcp"], env=env
+        command=sys.executable, args=["-m", "agent_sandbox_mcp"], env=os.environ
     )
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:

@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 from agent_sandbox.cli.state import StateStore
-
 from agent_sandbox_mcp.session import SandboxRegistry
 
 

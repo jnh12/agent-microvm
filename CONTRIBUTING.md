@@ -16,26 +16,24 @@ development environment, run the tests and linter, and open a pull request.
 git clone https://github.com/jnh12/agent-microvm.git
 cd agent-microvm
 
-uv sync --extra dev        # SDK + CLI + pytest/ruff + infra deps
-uv pip install ./mcp       # optional: the MCP server package
+uv sync --extra dev --extra mcp   # SDK + CLI + pytest/ruff + infra deps + MCP server
 ```
 
 With `pip` instead of `uv`:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pip install -e ./mcp       # optional
+pip install -e ".[dev,mcp]"
 ```
 
 ## Run the tests
 
 ```bash
 uv run pytest                       # SDK / infra unit tests
-uv run pytest mcp/tests -q          # MCP server unit + stdio smoke tests
+uv run pytest tests/mcp -q          # MCP server unit + stdio smoke tests (needs the mcp extra)
 
 # Live end-to-end tests (require deployed infra and AWS credentials):
-AGENT_SANDBOX_MCP_E2E=1 uv run python mcp/tests/e2e.py
+AGENT_SANDBOX_MCP_E2E=1 uv run python tests/mcp/e2e.py
 ```
 
 ## Lint and format

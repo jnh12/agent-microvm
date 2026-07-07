@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# uv
+.uv/
+uv.lock
+
+# Local sandbox state
+.agent_sandbox/
+
+# OS/editor
+.DS_Store
+.ruff_cache/
+.pytest_cache/
+
+.cursor

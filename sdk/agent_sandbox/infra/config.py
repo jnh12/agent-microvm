@@ -184,7 +184,7 @@ def _require_yaml():
     except ImportError as exc:  # pragma: no cover - guarded by [infra] extra
         raise SetupError(
             "PyYAML is required to read sandbox.yaml. Install with "
-            "`pip install vmnest[infra]`."
+            r"`pip install vmnest\[infra]`."
         ) from exc
     return yaml
 

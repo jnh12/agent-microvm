@@ -490,6 +490,180 @@ def _vm_is_gone(status: str | None) -> bool:
     return status.strip().upper() in _NOT_RUNNING_STATUSES
 
 
+def _is_websocket_upgrade(headers) -> bool:
+    """True if ``headers`` carry a WebSocket upgrade handshake (RFC 6455): a
+    ``Connection`` header with an ``upgrade`` token, plus ``Upgrade: websocket``.
+    """
+    connection_tokens = {
+        tok.strip().lower() for tok in headers.get("Connection", "").split(",") if tok.strip()
+    }
+    upgrade = headers.get("Upgrade", "").strip().lower()
+    return "upgrade" in connection_tokens and upgrade == "websocket"
+
+
+def _merge_websocket_protocols(existing: str | None, *extra: str) -> str:
+    """Append ``extra`` subprotocols to a raw ``Sec-WebSocket-Protocol`` value.
+
+    Preserves the client's requested order and skips anything already present,
+    so e.g. an app-level subprotocol like ``vite-hmr`` is kept alongside the
+    lambda-microvms auth/port subprotocols appended for the upstream leg.
+    """
+    tokens = [tok.strip() for tok in (existing or "").split(",") if tok.strip()]
+    for protocol in extra:
+        if protocol not in tokens:
+            tokens.append(protocol)
+    return ", ".join(tokens)
+
+
+def _parse_upstream_addr(base_url: str) -> tuple[str | None, int, bool]:
+    """Split a sandbox base URL into ``(host, port, is_tls)`` for a raw socket connect."""
+    from urllib.parse import urlsplit
+
+    parsed = urlsplit(base_url)
+    is_tls = parsed.scheme == "https"
+    port = parsed.port or (443 if is_tls else 80)
+    return parsed.hostname, port, is_tls
+
+
+def _relay_bidirectional(a, b, *, bufsize: int = 65536) -> None:
+    """Pump bytes between two connected sockets until either side closes.
+
+    Runs ``b`` -> ``a`` on a helper thread and ``a`` -> ``b`` inline, so the
+    caller's thread blocks until the connection ends in either direction.
+    """
+    import socket
+    import threading
+
+    def pump(src, dst) -> None:
+        try:
+            while True:
+                chunk = src.recv(bufsize)
+                if not chunk:
+                    break
+                dst.sendall(chunk)
+        except OSError:
+            pass
+        finally:
+            try:
+                dst.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
+
+    t = threading.Thread(target=pump, args=(b, a), daemon=True)
+    t.start()
+    pump(a, b)
+    t.join(timeout=5)
+
+
+def _websocket_handshake_and_relay(
+    handler,
+    *,
+    base_url: str,
+    verify: bool,
+    auth_token: str,
+    remote_port: int,
+) -> None:
+    """Relay a WebSocket upgrade (and subsequent frames) from ``handler`` to the
+    sandbox's endpoint.
+
+    ``httpx`` has no upgrade/duplex-socket support, so this bypasses it and
+    speaks raw HTTP/1.1 on a socket. The lambda-microvms auth token and target
+    port are injected as ``Sec-WebSocket-Protocol`` subprotocols (rather than
+    the ``X-aws-proxy-*`` headers plain HTTP forwarding uses), matching the
+    proxy's documented WebSocket convention -- see ``references/networking.md``
+    in the aws-lambda-microvms skill. ``handler`` only needs ``command``,
+    ``path``, ``headers``, ``connection``, and ``send_error`` (the subset of
+    ``BaseHTTPRequestHandler`` this uses), so tests can pass a minimal stand-in.
+    """
+    import socket
+    import ssl
+
+    host, port, is_tls = _parse_upstream_addr(base_url)
+    try:
+        raw = socket.create_connection((host, port), timeout=10)
+    except OSError as exc:
+        handler.send_error(502, f"upstream connection failed: {exc}")
+        return
+
+    if is_tls:
+        ctx = ssl.create_default_context()
+        if not verify:
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+        upstream = ctx.wrap_socket(raw, server_hostname=host)
+    else:
+        upstream = raw
+
+    protocols = _merge_websocket_protocols(
+        handler.headers.get("Sec-WebSocket-Protocol"),
+        "lambda-microvms",
+        f"lambda-microvms.authentication.{auth_token}",
+        f"lambda-microvms.port.{remote_port}",
+    )
+    lines = [f"{handler.command} {handler.path} HTTP/1.1\r\n"]
+    for key, val in handler.headers.items():
+        low = key.lower()
+        if low == "host":
+            lines.append(f"Host: {host}\r\n")
+        elif low == "sec-websocket-protocol":
+            continue
+        else:
+            lines.append(f"{key}: {val}\r\n")
+    lines.append(f"Sec-WebSocket-Protocol: {protocols}\r\n")
+    lines.append("\r\n")
+
+    try:
+        upstream.sendall("".join(lines).encode("latin-1"))
+    except OSError as exc:
+        handler.send_error(502, f"upstream error: {exc}")
+        upstream.close()
+        return
+
+    upstream_reader = upstream.makefile("rb")
+    status_line = upstream_reader.readline()
+    if not status_line:
+        handler.send_error(502, "upstream closed during handshake")
+        upstream.close()
+        return
+    header_bytes = [status_line]
+    while True:
+        line = upstream_reader.readline()
+        header_bytes.append(line)
+        if line in (b"\r\n", b"\n", b""):
+            break
+
+    try:
+        handler.connection.sendall(b"".join(header_bytes))
+    except OSError:
+        upstream.close()
+        return
+
+    status_code = int(status_line.split(b" ", 2)[1])
+    if status_code != 101:
+        # Handshake rejected upstream; the real status/headers were already
+        # forwarded verbatim above, so there's nothing left to relay.
+        upstream.close()
+        return
+
+    # `upstream_reader`'s internal buffer may already hold bytes past the
+    # header boundary (e.g. the first WS frame arriving in the same TCP
+    # segment as the 101 response) -- those are invisible to the raw
+    # `upstream.recv()` calls in `_relay_bidirectional`, so flush them first.
+    pending = upstream_reader.peek()
+    if pending:
+        upstream_reader.read(len(pending))
+        try:
+            handler.connection.sendall(pending)
+        except OSError:
+            upstream.close()
+            return
+
+    try:
+        _relay_bidirectional(handler.connection, upstream)
+    finally:
+        upstream.close()
+
+
 def _require_record(name: str) -> SandboxRecord:
     try:
         return StateStore().require(name)
@@ -597,7 +771,7 @@ def _load_infra_config(setup_file: str | None, stack: str | None):
     try:
         from agent_sandbox.infra.config import SetupError, load_setup
     except ImportError:
-        _fail("infra extra not installed. Run `pip install agent-sandbox-os[infra]`.")
+        _fail(r"infra extra not installed. Run `pip install agent-sandbox-os\[infra]`.")
     try:
         cfg = load_setup(setup_file)
     except SetupError as exc:
@@ -664,7 +838,7 @@ def infra_up(
     try:
         from agent_sandbox.infra.config import load_setups
     except ImportError:
-        _fail("infra extra not installed. Run `pip install agent-sandbox-os[infra]`.")
+        _fail(r"infra extra not installed. Run `pip install agent-sandbox-os\[infra]`.")
 
     try:
         configs = load_setups(files, stack=stack)
@@ -779,6 +953,10 @@ def forward(
     Runs a local reverse proxy that injects the required auth headers, so a
     plain browser/curl request to http://localhost:<local-port> reaches the app
     listening on <remote-port> inside the sandbox. Press Ctrl+C to stop.
+
+    WebSocket upgrades (e.g. dev-server HMR, chat apps) are also relayed: the
+    auth token and target port travel as lambda-microvms subprotocols on that
+    leg instead of headers.
     """
     import sys
     import threading
@@ -846,7 +1024,20 @@ def forward(
                 # Client disconnected mid-response (e.g. browser navigated away).
                 return
 
-        do_GET = do_POST = do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = _proxy
+        def _handle_get(self) -> None:
+            if _is_websocket_upgrade(self.headers):
+                _websocket_handshake_and_relay(
+                    self,
+                    base_url=base_url,
+                    verify=verify,
+                    auth_token=token["value"],
+                    remote_port=remote_port,
+                )
+            else:
+                self._proxy()
+
+        do_GET = _handle_get
+        do_POST = do_PUT = do_DELETE = do_PATCH = do_HEAD = do_OPTIONS = _proxy
 
     class _QuietThreadingHTTPServer(ThreadingHTTPServer):
         daemon_threads = True

@@ -9,7 +9,8 @@ FROM --platform=linux/arm64 python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    AGENTD_PORT=8080
+    AGENTD_PORT=8080 \
+    AGENTD_HOOK_PORT=9000
 
 WORKDIR /opt/agentd
 
@@ -18,8 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY agentd ./agentd
 
-EXPOSE 8080
+# 8080: agentd application API (proxied to clients). 9000: lifecycle hooks
+# (platform-only). Both must be exposed so the platform can reach the hook port.
+EXPOSE 8080 9000
 
-# agentd is the entrypoint of the sandbox: it exposes exec/fs over HTTP on the
-# MicroVM's dedicated endpoint. User workloads are launched via exec calls.
-CMD ["uvicorn", "agentd.app:app", "--host", "0.0.0.0", "--port", "8080"]
+# serve.py starts both listeners in one process: agentd on AGENTD_PORT and the
+# lifecycle-hook server on AGENTD_HOOK_PORT. User workloads are launched via exec.
+CMD ["python", "-m", "agentd.serve"]

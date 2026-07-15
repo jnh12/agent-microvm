@@ -1,12 +1,12 @@
-"""Bare-boto3 infra provisioner (replaces the Pulumi runner + program).
+"""Bare-boto3 infra provisioner.
 
 Orchestrates the resource handlers in :mod:`agent_sandbox.infra.resources`,
 records what it created in :mod:`agent_sandbox.infra.state`, and applies the
 reuse-or-create rules from :class:`agent_sandbox.infra.config.InfraConfig`.
 
-Public surface mirrors the old ``asb infra`` commands: ``up``, ``plan``
-(preview), ``destroy``, ``refresh``, ``outputs`` -- plus a module-level
-``read_outputs`` used by the CLI to auto-wire image/role.
+Public surface backs the ``asb infra`` commands: ``up``, ``plan`` (preview),
+``destroy``, ``refresh``, ``outputs`` -- plus a module-level ``read_outputs``
+used by the CLI to auto-wire image/role.
 """
 
 from __future__ import annotations

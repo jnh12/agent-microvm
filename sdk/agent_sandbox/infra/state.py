@@ -1,8 +1,7 @@
 """Local JSON state for the boto3 infra provisioner.
 
-Replaces Pulumi's state backend with a small self-managed file, mirroring the
-sandbox-name store in :mod:`agent_sandbox.cli.state`. It records, per
-``project/stack``:
+A small self-managed state file, mirroring the sandbox-name store in
+:mod:`agent_sandbox.cli.state`. It records, per ``project/stack``:
 
 - ``resources``: for each logical resource (role, bucket, guest_object, image,
   security_group) an id and a ``managed`` flag (True if we created it, False if

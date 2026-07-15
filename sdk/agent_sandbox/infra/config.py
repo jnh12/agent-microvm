@@ -181,10 +181,10 @@ class InfraConfig:
 def _require_yaml():
     try:
         import yaml
-    except ImportError as exc:  # pragma: no cover - guarded by [infra] extra
+    except ImportError as exc:  # pragma: no cover - PyYAML is a base dependency
         raise SetupError(
-            "PyYAML is required to read sandbox.yaml. Install with "
-            r"`pip install agent-sandbox-os\[infra]`."
+            "PyYAML is required to read sandbox.yaml but is not installed. "
+            "Reinstall the package (`uv sync`, or `pip install -e .`)."
         ) from exc
     return yaml
 

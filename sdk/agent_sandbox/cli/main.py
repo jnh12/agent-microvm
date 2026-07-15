@@ -17,6 +17,7 @@ from rich.table import Table
 
 from agent_sandbox.control_plane import ControlPlane
 from agent_sandbox.errors import SandboxError
+from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .state import SandboxRecord, StateStore
@@ -771,7 +772,8 @@ def _load_infra_config(setup_file: str | None, stack: str | None):
     try:
         from agent_sandbox.infra.config import SetupError, load_setup
     except ImportError:
-        _fail(r"infra extra not installed. Run `pip install agent-sandbox-os\[infra]`.")
+        _fail("infra dependencies missing (PyYAML). Reinstall the package: `uv sync` "
+              "(or `pip install -e .`).")
     try:
         cfg = load_setup(setup_file)
     except SetupError as exc:
@@ -838,7 +840,8 @@ def infra_up(
     try:
         from agent_sandbox.infra.config import load_setups
     except ImportError:
-        _fail(r"infra extra not installed. Run `pip install agent-sandbox-os\[infra]`.")
+        _fail("infra dependencies missing (PyYAML). Reinstall the package: `uv sync` "
+              "(or `pip install -e .`).")
 
     try:
         configs = load_setups(files, stack=stack)
@@ -965,6 +968,12 @@ def forward(
     import httpx
 
     rec = _require_record(name)
+    if remote_port == HOOK_PORT:
+        _fail(
+            f"port {HOOK_PORT} is the reserved lifecycle-hook port and cannot be "
+            "forwarded (it is the platform's private control plane). "
+            "Set $AGENT_SANDBOX_HOOK_PORT if your image uses a different hook port."
+        )
     local = local_port or remote_port
     verify = not no_verify_tls
     hop_by_hop = {"content-encoding", "content-length", "transfer-encoding",

@@ -1,5 +1,5 @@
 [project]
-name = "agent-sandbox-os"
+name = "asbox"
 version = "0.1.0"
 description = "Embeddable Python SDK + CLI for isolated microVM sandboxes on AWS Lambda MicroVMs (a Python fork of microsandbox concepts)."
 readme = "README.md"
@@ -17,14 +17,14 @@ dependencies = [
 
 [project.optional-dependencies]
 # Infra ships in the core dependencies now; this extra is kept as a no-op so
-# `pip install agent-sandbox-os[infra]` continues to resolve.
+# `pip install asbox[infra]` continues to resolve.
 infra = []
 # Optional ISA-L accelerated DEFLATE for faster guest-image zipping.
 # The zip helper degrades to stdlib zlib when this is absent, so this is opt-in.
 isal = [
     "isal>=1.6",
 ]
-# MCP support stays opt-in: install with `agent-sandbox-os[mcp]`.
+# MCP support stays opt-in: install with `asbox[mcp]`.
 mcp = [
     "mcp>=1.2",
 ]
@@ -48,7 +48,7 @@ packages = ["sdk/agent_sandbox", "sdk/agent_sandbox_mcp"]
 exclude = ["**/__pycache__", "**/*.pyc"]
 
 # Bundle the guest image source (Dockerfile + agentd) into the package so a
-# `pip install agent-sandbox-os` can build a MicroVM image without a repo
+# `pip install asbox` can build a MicroVM image without a repo
 # checkout. Resolved at runtime via agent_sandbox.guest_source; a user-provided
 # ./guest (or an explicit path) still takes precedence.
 [tool.hatch.build.targets.wheel.force-include]

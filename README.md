@@ -426,8 +426,8 @@ extra:
 ```bash
 # from a source checkout (editable — tracks your working tree):
 uv tool install --editable ".[mcp]" --force
-# or from PyPI:
-uv tool install "agent-sandbox-os[mcp]"
+# or from PyPI (published as `asbox`):
+uv tool install "asbox[mcp]"
 ```
 
 > **Gotcha:** keep the `[mcp]` extra every time you (re)install the global tool.

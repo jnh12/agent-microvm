@@ -382,20 +382,34 @@ def metrics(
 
 @image_app.command("build")
 def image_build(
-    directory: str = typer.Argument(..., help="Directory with Dockerfile + code."),
+    directory: str | None = typer.Argument(
+        None, help="Guest dir with a Dockerfile (default: ./guest, else the bundled guest)."
+    ),
     name: str = typer.Option(..., "--name", "-n", help="Image name."),
     bucket: str = typer.Option(..., "--bucket", "-b", help="S3 bucket for the build zip."),
     role: str | None = typer.Option(None, "--role"),
     region: str | None = typer.Option(None, "--region"),
 ) -> None:
-    """Zip a directory, upload to S3, and create a MicroVM image."""
+    """Zip a guest directory, upload to S3, and create a MicroVM image.
+
+    With no directory, uses ./guest if present, otherwise the guest source
+    bundled in the installed package (so a pip install can build without a
+    repo checkout).
+    """
     import boto3
 
+    from agent_sandbox.guest_source import is_guest_dir, resolve_guest_dir
     from agent_sandbox.infra import resources as R
 
-    src = os.path.abspath(directory)
-    if not os.path.isdir(src):
-        _fail(f"not a directory: {directory}")
+    if directory is not None:
+        src = os.path.abspath(directory)
+        if not is_guest_dir(src):
+            _fail(f"not a guest directory (needs a Dockerfile): {directory}")
+    else:
+        try:
+            src = resolve_guest_dir(os.path.abspath("./guest"), allow_bundled_fallback=True)
+        except FileNotFoundError as exc:
+            _fail(str(exc))
 
     key = f"microvm-images/{name}.zip"
     s3 = boto3.client("s3", region_name=region)

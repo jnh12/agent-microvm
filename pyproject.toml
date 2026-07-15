@@ -45,6 +45,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["sdk/agent_sandbox", "sdk/agent_sandbox_mcp"]
+exclude = ["**/__pycache__", "**/*.pyc"]
+
+# Bundle the guest image source (Dockerfile + agentd) into the package so a
+# `pip install agent-sandbox-os` can build a MicroVM image without a repo
+# checkout. Resolved at runtime via agent_sandbox.guest_source; a user-provided
+# ./guest (or an explicit path) still takes precedence.
+[tool.hatch.build.targets.wheel.force-include]
+"guest" = "agent_sandbox/_bundled_guest"
 
 [tool.ruff]
 line-length = 100

@@ -102,6 +102,7 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 - [Environment variables](#environment-variables)
 - [Use it from an AI agent (MCP)](#use-it-from-an-ai-agent-mcp)
 - [Guest agent & lifecycle hooks](#guest-agent--lifecycle-hooks)
+- [Bring your own guest image](#bring-your-own-guest-image)
 - [Local guest-image smoke test](#local-guest-image-smoke-test)
 - [Status / not yet implemented](#status--not-yet-implemented)
 - [Contributing](#contributing)
@@ -630,7 +631,10 @@ metadata (`truncated`, `total_bytes`, `returned_bytes`) when shortened.
 
 The server reuses the SDK/CLI variables from
 [Environment variables](#environment-variables) (image/role ARN, region, egress
-connector, TLS, workdir) and adds these MCP-specific tuning knobs:
+connector, TLS, workdir) and adds these MCP-specific tuning knobs. If you run a
+**custom guest image**, also see
+[Bring your own guest image → If you use MCP](#if-you-use-mcp-with-a-custom-image)
+for the env values the MCP process must resolve independently:
 
 | Env var | Default | Description |
 | --- | --- | --- |
@@ -702,6 +706,49 @@ client-reachable, and auth tokens are scoped to the app port only.
 the matching `AGENT_SANDBOX_AGENT_PORT` / `AGENT_SANDBOX_HOOK_PORT`. Keep the two
 hook-port values in sync — the SDK tells the platform which port to call, and the
 guest must bind the same one.
+
+## Bring your own guest image
+
+You don't have to use the bundled guest. `asb image build ./my-guest` (or
+`image.guest_dir` in `sandbox.yaml`) accepts any directory with a `Dockerfile`.
+But the SDK, `asb` CLI, **and the MCP server** all reach into the VM through the
+same small HTTP agent (`agentd`), so a custom image must honor that contract or
+`exec`/`fs` — and therefore **every MCP `sandbox_*` tool** — will fail to
+connect. To keep a custom image working:
+
+1. **Serve the agentd API on the agent port.** Your image must answer
+   `POST /v1/exec`, `POST /v1/fs/read`, `POST /v1/fs/write`, and `GET /healthz`
+   on `AGENTD_PORT` (default `8080`). Easiest path: base your `Dockerfile` on the
+   bundled guest, or `COPY` the bundled `agentd` package + `serve.py` into your
+   image and keep its `CMD` (`python -m agentd.serve`).
+2. **Keep the agent port aligned on both sides.** The guest binds `AGENTD_PORT`;
+   the SDK/CLI/MCP scope auth tokens to `AGENT_SANDBOX_AGENT_PORT`. If you change
+   one, change the other — a mismatch means the proxy can't route to your agent.
+3. **Lifecycle hooks are opt-in.** To keep them, run `agentd.serve` (it starts
+   the hook server too), `EXPOSE` + bind `AGENTD_HOOK_PORT` (default `9000`), keep
+   `AGENT_SANDBOX_HOOK_PORT` in sync, and build with `--hooks`
+   (`asb infra up` does this). Drop them and the sandbox still works — you just
+   lose the faster-start / per-VM-uniqueness benefits (see above).
+
+### If you use MCP with a custom image
+
+The MCP server runs as its **own process**, launched by your MCP client — it does
+**not** inherit your shell's environment. So any value you overrode for the guest
+must *also* be resolvable in the MCP process, wired through the client's `env`
+block (see the config examples under
+[Use it from an AI agent (MCP)](#use-it-from-an-ai-agent-mcp)):
+
+| Env var | Must match | Why |
+| --- | --- | --- |
+| `AGENT_SANDBOX_IMAGE_ARN` | your custom image's ARN | MCP creates sandboxes from it |
+| `AGENT_SANDBOX_EXECUTION_ROLE_ARN` | your execution role | assumed by the MicroVM |
+| `AGENT_SANDBOX_AGENT_PORT` | the port your agent binds (`AGENTD_PORT`) | MCP scopes exec/fs auth tokens to it |
+| `AGENT_SANDBOX_HOOK_PORT` | your guest's `AGENTD_HOOK_PORT` | keeps `asb forward` guarding the right port |
+
+A mismatch between the port the MCP process scopes tokens to and the port your
+custom agent actually binds is the usual cause of MCP `sandbox_exec` /
+`sandbox_fs_*` "failed to connect" errors. When in doubt, keep the defaults
+(`8080` / `9000`) and set only the two ARNs.
 
 ## Local guest-image smoke test
 

@@ -16,9 +16,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from agent_sandbox.guest_source import resolve_guest_dir
+
 DEFAULT_SETUP_FILE = "sandbox.yaml"
 LEGACY_SETUP_FILE = "setup.yaml"
 ENV_SETUP = "AGENT_SANDBOX_SETUP"
+DEFAULT_GUEST_DIR = "./guest"
 
 
 class SetupError(ValueError):
@@ -28,7 +31,7 @@ class SetupError(ValueError):
 @dataclass(slots=True)
 class ImageConfig:
     name: str = "agent-sandbox-guest"
-    guest_dir: str = "./guest"
+    guest_dir: str = DEFAULT_GUEST_DIR
     # Managed base image the MicroVM image is built on top of. Empty -> the
     # newest managed base image is auto-discovered (e.g. al2023).
     base_image_arn: str = ""
@@ -119,7 +122,16 @@ class InfraConfig:
         path = Path(self.image.guest_dir)
         if not path.is_absolute():
             path = Path(self.base_dir) / path
-        return str(path.resolve())
+        resolved = str(path.resolve())
+        # A pip install with no ./guest checkout falls back to the bundled guest —
+        # but only for the default guest_dir, so a custom path that's missing
+        # still fails validate() instead of being masked. Compare normalized
+        # paths so "guest", "./guest", and "./guest/" all count as the default.
+        is_default = Path(self.image.guest_dir) == Path(DEFAULT_GUEST_DIR)
+        try:
+            return resolve_guest_dir(resolved, allow_bundled_fallback=is_default)
+        except FileNotFoundError:
+            return resolved  # let validate() produce the clear error message
 
     def validate(self) -> None:
         if not self.project:

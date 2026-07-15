@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from agent_sandbox.ports import AGENT_PORT
+
 
 class SandboxState(StrEnum):
     """Lifecycle states, mirroring microsandbox's sandbox lifecycle.
@@ -66,7 +68,7 @@ class SandboxConfig:
     execution_role_arn: str | None = None
     region: str | None = None
     idle_policy: IdlePolicy = field(default_factory=IdlePolicy)
-    agent_port: int = 8080
+    agent_port: int = AGENT_PORT
     # Optional network connectors (ARNs). Empty -> image/default egress.
     ingress_network_connectors: list[str] = field(default_factory=list)
     egress_network_connectors: list[str] = field(default_factory=list)

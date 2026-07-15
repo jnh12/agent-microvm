@@ -10,12 +10,24 @@ from __future__ import annotations
 import base64
 import os
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from agentd import state
 from agentd.exec import run_command
 
-app = FastAPI(title="agentd", version="0.1.0")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # Signals the /ready lifecycle hook that agentd has fully started, so the
+    # platform snapshots a serving agentd rather than a half-booted one.
+    state.ready.set()
+    yield
+
+
+app = FastAPI(title="agentd", version="0.1.0", lifespan=_lifespan)
 
 
 class ExecRequest(BaseModel):
@@ -56,13 +68,14 @@ async def healthz() -> dict[str, str]:
 @app.post("/v1/exec", response_model=ExecResponse)
 async def exec_command(req: ExecRequest) -> ExecResponse:
     try:
-        outcome = await run_command(
-            req.command,
-            req.args,
-            cwd=req.cwd,
-            env=req.env,
-            timeout=req.timeout,
-        )
+        with state.track():
+            outcome = await run_command(
+                req.command,
+                req.args,
+                cwd=req.cwd,
+                env=req.env,
+                timeout=req.timeout,
+            )
     except TimeoutError as exc:
         raise HTTPException(status_code=504, detail="command timed out") from exc
     except FileNotFoundError as exc:

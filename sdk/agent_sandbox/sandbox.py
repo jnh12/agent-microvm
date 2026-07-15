@@ -20,6 +20,7 @@ from agent_sandbox.agent_client import AgentClient
 from agent_sandbox.control_plane import ControlPlane, MicroVMInfo
 from agent_sandbox.errors import SandboxError
 from agent_sandbox.models import ExecResult, IdlePolicy, SandboxConfig, SandboxState
+from agent_sandbox.ports import AGENT_PORT
 
 ENV_IMAGE_ARN = "AGENT_SANDBOX_IMAGE_ARN"
 ENV_ROLE_ARN = "AGENT_SANDBOX_EXECUTION_ROLE_ARN"
@@ -71,7 +72,7 @@ class Sandbox:
         execution_role_arn: str | None = None,
         region: str | None = None,
         idle_policy: IdlePolicy | None = None,
-        agent_port: int = 8080,
+        agent_port: int = AGENT_PORT,
         image_version: str | None = None,
         ingress_network_connectors: list[str] | None = None,
         egress_network_connectors: list[str] | None = None,

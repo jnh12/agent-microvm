@@ -137,6 +137,7 @@ class FakeMv:
 
     def create_microvm_image(self, **kw):
         self.created = True
+        self.create_kwargs = kw  # captured so tests can assert the request shape
         self.active = True  # becomes active for the subsequent poll
         return {"imageArn": "arn:img"}
 
@@ -155,6 +156,21 @@ def test_ensure_image_builds_when_absent():
                         build_role_arn="arn:role", code_uri="s3://b/k")
     assert out["created"] is True
     assert mv.created is True
+
+
+def test_ensure_image_passes_lifecycle_hooks():
+    mv = FakeMv(active=False)
+    R.ensure_image(mv, name="agent-sandbox-guest",
+                   build_role_arn="arn:role", code_uri="s3://b/k")
+    hooks = mv.create_kwargs["hooks"]
+    from agent_sandbox.ports import HOOK_PORT
+    assert hooks["port"] == HOOK_PORT
+    # Both build hooks and all four runtime hooks are enabled with explicit timeouts.
+    assert hooks["microvmImageHooks"]["ready"] == "ENABLED"
+    assert hooks["microvmImageHooks"]["validate"] == "ENABLED"
+    for name in ("run", "resume", "suspend", "terminate"):
+        assert hooks["microvmHooks"][name] == "ENABLED"
+        assert hooks["microvmHooks"][f"{name}TimeoutInSeconds"] >= 1
 
 
 def test_ensure_image_rebuild_forces_build_even_when_active():

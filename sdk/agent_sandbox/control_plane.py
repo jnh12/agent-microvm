@@ -26,6 +26,7 @@ except ImportError as exc:  # pragma: no cover - import guard
     ) from exc
 
 from agent_sandbox.errors import ControlPlaneError, SandboxTimeoutError
+from agent_sandbox.ports import AGENT_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -214,7 +215,7 @@ class ControlPlane:
             "create_microvm_auth_token",
             microvmIdentifier=microvm_id,
             expirationInMinutes=expiration_in_minutes,
-            allowedPorts=allowed_ports or [{"port": 8080}],
+            allowedPorts=allowed_ports or [{"port": AGENT_PORT}],
         )
         # authToken is a header map, e.g. {"X-aws-proxy-auth": "<token>"}.
         token_map = _first(resp, "authToken", "AuthToken") or {}

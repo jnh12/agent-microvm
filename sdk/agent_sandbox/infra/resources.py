@@ -4,8 +4,8 @@ Each ``ensure_*`` creates the resource if absent (or adopts an existing one with
 the same name) and is safe to re-run; each ``delete_*`` tears it down. These are
 pure functions over boto3 clients so they can be unit-tested with stubs/moto.
 
-Ports the resource definitions previously expressed as Pulumi components
-(iam/storage/image/network) to direct API calls.
+Covers the IAM role, S3 build bucket, guest object, MicroVM image, and egress
+security group as direct API calls.
 """
 
 from __future__ import annotations
@@ -17,9 +17,41 @@ from typing import Any
 from botocore.exceptions import ClientError
 
 from agent_sandbox.infra import archive
+from agent_sandbox.ports import HOOK_PORT
 
 LOGS_POLICY_NAME = "agent-sandbox-logs"
 S3_READ_POLICY_NAME = "agent-sandbox-s3-read"
+
+
+def _default_hooks() -> dict[str, Any]:
+    """The lifecycle hooks agentd implements, baked into the image at build.
+
+    ``ready``/``validate`` ensure the snapshot captures a fully-booted, working
+    agentd. The MicroVM hooks fire at runtime for per-VM uniqueness (``run``/
+    ``resume``) and clean drain/flush (``suspend``/``terminate``). The port must
+    match what the guest binds (``agentd.ports.HOOK_PORT``).
+    """
+    return {
+        "port": HOOK_PORT,
+        "microvmImageHooks": {
+            "ready": "ENABLED",
+            "readyTimeoutInSeconds": 60,
+            "validate": "ENABLED",
+            "validateTimeoutInSeconds": 15,
+        },
+        "microvmHooks": {
+            "run": "ENABLED",
+            "runTimeoutInSeconds": 5,
+            "resume": "ENABLED",
+            "resumeTimeoutInSeconds": 5,
+            "suspend": "ENABLED",
+            # Guest drains in-flight exec for AGENTD_SUSPEND_DRAIN_SECONDS (default
+            # 8) before acking; keep this strictly larger. See agentd/hooks.py.
+            "suspendTimeoutInSeconds": 10,
+            "terminate": "ENABLED",
+            "terminateTimeoutInSeconds": 10,
+        },
+    }
 
 ASSUME_ROLE_POLICY = {
     "Version": "2012-10-17",
@@ -282,6 +314,7 @@ def ensure_image(
         "baseImageArn": base,
         "buildRoleArn": build_role_arn,
         "codeArtifact": {"uri": code_uri},
+        "hooks": _default_hooks(),
     }
     if base_image_version:
         args["baseImageVersion"] = base_image_version

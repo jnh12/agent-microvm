@@ -426,8 +426,8 @@ extra:
 ```bash
 # from a source checkout (editable — tracks your working tree):
 uv tool install --editable ".[mcp]" --force
-# or from PyPI:
-uv tool install "agent-microvm[mcp]"
+# or from PyPI (published as `vmnest`):
+uv tool install "vmnest[mcp]"
 ```
 
 > **Gotcha:** keep the `[mcp]` extra every time you (re)install the global tool.

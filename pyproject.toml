@@ -24,7 +24,7 @@ infra = []
 isal = [
     "isal>=1.6",
 ]
-# MCP support stays opt-in: install with `agent-microvm[mcp]`.
+# MCP support stays opt-in: install with `vmnest[mcp]`.
 mcp = [
     "mcp>=1.2",
 ]

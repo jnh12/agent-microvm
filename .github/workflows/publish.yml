@@ -1,0 +1,77 @@
+name: Publish
+
+# Branch → index:
+#   develop → TestPyPI   (test releases)
+#   main    → PyPI       (production releases)
+#
+# Uses PyPI Trusted Publishing (OIDC) — no API tokens/secrets. Each index has a
+# GitHub Environment (testpypi / pypi) that must be registered as a trusted
+# publisher on that index (workflow: publish.yml, environment: <name>).
+#
+# NOTE: both indexes reject re-uploading an existing version, so bump `version`
+# in pyproject.toml to actually release. `skip-existing` makes an unbumped push
+# a no-op instead of a failure.
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --extra mcp --extra dev
+      - run: uv run pytest tests/ -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv build
+      # Fail early if the guest source didn't get bundled into the wheel.
+      - name: Verify bundled guest in wheel
+        run: |
+          unzip -l dist/*.whl | grep -q "agent_sandbox/_bundled_guest/Dockerfile" \
+            || { echo "::error::wheel is missing bundled guest source"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-testpypi:
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write        # required for trusted publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  publish-pypi:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # required for trusted publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

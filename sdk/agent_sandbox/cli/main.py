@@ -1146,16 +1146,44 @@ def infra_output(
     name: str | None = typer.Argument(None, help="Single output name, or all if omitted."),
     setup_file: str | None = typer.Option(None, "--file", "-f"),
     stack: str | None = typer.Option(None, "--stack", "-s"),
+    all_stacks: bool = typer.Option(
+        False, "--all", help="List outputs for every provisioned project/stack."
+    ),
 ) -> None:
-    """Print stack outputs (image_arn, execution_role_arn, ...)."""
-    outputs = _provisioner(setup_file, stack).outputs()
-    if name:
-        if name not in outputs:
+    """Print stack outputs (project, image_arn, execution_role_arn, ...)."""
+    if all_stacks:
+        from agent_sandbox.infra.state import InfraStateStore
+
+        store = InfraStateStore()
+        stacks = [
+            {"project": proj, "stack": stk, **store.load(proj, stk).outputs}
+            for proj, stk in store.list_stacks()
+        ]
+        console.print_json(json.dumps({"stacks": stacks, "count": len(stacks)}, default=str))
+        return
+
+    cfg = _load_infra_config(setup_file, stack)
+    from agent_sandbox.infra.provisioner import Provisioner
+
+    outputs = Provisioner(cfg).outputs()
+    if not outputs:
+        # Nothing provisioned for this project/stack (never brought up, or
+        # destroyed). Don't fabricate a project/stack label that looks live.
+        if name:
             _fail(f"no such output: {name}")
-        value = outputs[name]
+        console.print_json(json.dumps({}, default=str))
+        return
+
+    # Label which project/stack these outputs belong to (state keys them by
+    # project/stack, so the raw outputs dict alone doesn't say).
+    labeled = {"project": cfg.project, "stack": cfg.stack, **outputs}
+    if name:
+        if name not in labeled:
+            _fail(f"no such output: {name}")
+        value = labeled[name]
         console.print(value if isinstance(value, str) else json.dumps(value, default=str))
     else:
-        console.print_json(json.dumps(outputs, default=str))
+        console.print_json(json.dumps(labeled, default=str))
 
 
 if __name__ == "__main__":

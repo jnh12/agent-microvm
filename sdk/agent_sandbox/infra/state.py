@@ -105,6 +105,16 @@ class InfraStateStore:
         tmp.write_text(json.dumps(payload, indent=2))
         tmp.replace(self._path)
 
+    def list_stacks(self) -> list[tuple[str, str]]:
+        """Return ``(project, stack)`` for every provisioned stack in the store."""
+        with self._lock:
+            keys = list(self._stacks.keys())
+        pairs: list[tuple[str, str]] = []
+        for key in keys:
+            project, _, stack = key.partition("/")
+            pairs.append((project, stack))
+        return pairs
+
     def load(self, project: str, stack: str) -> StackState:
         with self._lock:
             raw = self._stacks.get(self._key(project, stack))

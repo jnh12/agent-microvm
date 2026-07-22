@@ -50,6 +50,13 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
 
         return _dumps(_check(config))
 
+    @mcp.resource("agent-sandbox://infra")
+    async def infra_resource() -> str:
+        """Resolved `asb infra` outputs (image/role/region/egress) for sandboxes."""
+        from agent_sandbox_mcp.tools.infra import build_outputs
+
+        return _dumps(build_outputs(config))
+
     @mcp.resource("agent-sandbox://sandboxes")
     async def sandboxes_resource() -> str:
         """Current inventory of locally tracked sandboxes."""

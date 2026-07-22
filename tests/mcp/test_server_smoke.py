@@ -18,6 +18,8 @@ from mcp.client.stdio import stdio_client
 EXPECTED_TOOLS = {
     "runtime_check",
     "runtime_install",
+    "infra_outputs",
+    "infra_list",
     "sandbox_run",
     "sandbox_create",
     "sandbox_start",
@@ -53,6 +55,7 @@ EXPECTED_TOOLS = {
 
 EXPECTED_RESOURCES = {
     "agent-sandbox://runtime",
+    "agent-sandbox://infra",
     "agent-sandbox://sandboxes",
     "agent-sandbox://images",
     "agent-sandbox://policy",

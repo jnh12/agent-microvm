@@ -87,10 +87,27 @@ reproducible base, no rebuild per sandbox.
 image, execution role, S3 build bucket, and optional network connectors with bare
 `boto3`, recording everything in a local state file.
 
+## Demo
+
+Both recordings are unedited captures of the real CLI against real AWS.
+
+**Install, configure, provision** — `uv pip install "asbox[mcp]"`, the whole of
+`sandbox.yaml`, then `asb infra up` building the MicroVM image and wiring up the
+role and build bucket:
+
+![Installing asbox and provisioning the MicroVM backend with asb infra up](demo/01-setup.gif)
+
+**Boot a sandbox and serve an app out of it** — `asb create` (a ~3 second boot),
+write a FastAPI app into the VM with `asb exec`, start uvicorn, then `asb
+forward` the port to localhost and `curl` it:
+
+![Creating a sandbox, serving FastAPI from it, and forwarding the port to localhost](demo/02-sandbox.gif)
+
 ## Contents
 
 - [Why agent-sandbox-os?](#why-agent-sandbox-os)
   - [Use cases](#use-cases)
+- [Demo](#demo)
 - [Components](#components)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)

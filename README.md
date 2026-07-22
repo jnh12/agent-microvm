@@ -87,10 +87,25 @@ reproducible base, no rebuild per sandbox.
 image, execution role, S3 build bucket, and optional network connectors with bare
 `boto3`, recording everything in a local state file.
 
+## Demo
+
+Both recordings are unedited captures of the real CLI against real AWS.
+
+**Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
+`sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
+role and build bucket:
+
+
+**Boot a sandbox and serve an app out of it** — `vmnest create` (a ~3 second boot),
+write a FastAPI app into the VM with `vmnest exec`, start uvicorn, then `vmnest
+forward` the port to localhost and `curl` it:
+
+
 ## Contents
 
 - [Why agent-microvm?](#why-agent-microvm)
   - [Use cases](#use-cases)
+- [Demo](#demo)
 - [Components](#components)
 - [Architecture](#architecture)
 - [Prerequisites](#prerequisites)

@@ -10,6 +10,20 @@ and provisioned with **bare `boto3`** (no external IaC engine required).
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 
+## Demo
+
+Both recordings are unedited captures of the real CLI against real AWS.
+
+**Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
+`sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
+role and build bucket:
+
+
+**Boot a sandbox and serve an app out of it** — `vmnest create` (a ~3 second boot),
+write a FastAPI app into the VM with `vmnest exec`, start uvicorn, then `vmnest
+forward` the port to localhost and `curl` it:
+
+
 ## Why agent-microvm?
 
 Agentic workloads run **untrusted, model-generated code**. The agent decides at
@@ -89,6 +103,7 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 
 ## Contents
 
+- [Demo](#demo)
 - [Why agent-microvm?](#why-agent-microvm)
   - [Use cases](#use-cases)
 - [Components](#components)

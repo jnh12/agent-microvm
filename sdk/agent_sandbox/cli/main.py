@@ -50,6 +50,19 @@ def _fail(message: str) -> None:
     raise typer.Exit(code=1)
 
 
+def _is_missing(exc: ImportError, *modules: str) -> bool:
+    """True when `exc` means one of `modules` is genuinely not installed.
+
+    Anything else -- a bare ImportError, or a ModuleNotFoundError naming some
+    other module -- means the dependency *is* installed but failed to load, e.g.
+    an architecture/ABI mismatch in a compiled wheel. Those need the underlying
+    error reported, not an install hint that sends people down the wrong path.
+    """
+    if not isinstance(exc, ModuleNotFoundError):
+        return False
+    return (exc.name or "").split(".")[0] in modules
+
+
 _infra_outputs_cache: dict | None = None
 
 
@@ -785,9 +798,13 @@ network:                        # OPTIONAL. Omit entirely for default public egr
 def _load_infra_config(setup_file: str | None, stack: str | None):
     try:
         from agent_sandbox.infra.config import SetupError, load_setup
-    except ImportError:
-        _fail("infra dependencies missing (PyYAML). Reinstall the package: `uv sync` "
-              "(or `pip install -e .`).")
+    except ImportError as exc:
+        if _is_missing(exc, "yaml"):
+            _fail(
+                "infra dependencies missing (PyYAML). Reinstall the package: `uv sync` "
+                "(or `pip install -e .`)."
+            )
+        _fail(f"infra dependencies are installed but failed to load: {exc}")
     try:
         cfg = load_setup(setup_file)
     except SetupError as exc:
@@ -853,9 +870,13 @@ def infra_up(
 
     try:
         from agent_sandbox.infra.config import load_setups
-    except ImportError:
-        _fail("infra dependencies missing (PyYAML). Reinstall the package: `uv sync` "
-              "(or `pip install -e .`).")
+    except ImportError as exc:
+        if _is_missing(exc, "yaml"):
+            _fail(
+                "infra dependencies missing (PyYAML). Reinstall the package: `uv sync` "
+                "(or `pip install -e .`)."
+            )
+        _fail(f"infra dependencies are installed but failed to load: {exc}")
 
     try:
         configs = load_setups(files, stack=stack)
@@ -1131,11 +1152,19 @@ def mcp() -> None:
     """
     try:
         from agent_sandbox_mcp.server import main as _mcp_main
-    except ImportError:
+    except ImportError as exc:
+        if _is_missing(exc, "agent_sandbox_mcp", "mcp", "fastmcp"):
+            _fail(
+                "MCP server not available. Install the `mcp` extra with "
+                r"`pip install asbox\[mcp]` (or `uv pip install -e '.\[mcp]'` "
+                "in a source checkout)."
+            )
         _fail(
-            "MCP server not available. Install the `mcp` extra with "
-            r"`pip install agent-sandbox-os\[mcp]` (or `uv pip install -e '.\[mcp]'` "
-            "in a source checkout)."
+            f"MCP server is installed but failed to load: {exc}\n"
+            "This usually means a dependency was built for a different platform "
+            "(e.g. an x86_64 wheel in an arm64 environment). Recreate the "
+            "environment with a native interpreter, e.g. "
+            "`uv venv --managed-python --python 3.12`."
         )
         return
     _mcp_main()

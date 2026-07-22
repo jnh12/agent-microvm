@@ -152,16 +152,25 @@ with `boto3` (a core dependency) and tracks state in a local JSON file.
 
 ## 1. Install the SDK/CLI
 
-Clone the repository and install with [`uv`](https://docs.astral.sh/uv/) (recommended) or `pip`:
+The package is published on PyPI as **`asbox`** (the import name and `asb` CLI are
+unchanged). Install with `pip`:
+
+```bash
+pip install asbox            # SDK + CLI + infra (PyYAML is a base dependency)
+pip install "asbox[mcp]"     # + MCP server (FastMCP) — see the MCP section below
+pip install "asbox[isal]"    # + faster ISA-L guest-image zipping (optional accelerator)
+```
+
+Or work from a clone with [`uv`](https://docs.astral.sh/uv/) (recommended for development):
 
 ```bash
 git clone https://github.com/jnh12/agent-microvm.git
 cd agent-sandbox-os
 
-uv sync                 # SDK + CLI + infra (PyYAML is a base dependency)
-uv sync --extra mcp     # + MCP server (FastMCP) — see the MCP section below
-uv sync --extra isal    # + faster ISA-L guest-image zipping (optional accelerator)
-# or, with pip in a virtualenv:
+uv sync                 # SDK + CLI + infra
+uv sync --extra mcp     # + MCP server (FastMCP)
+uv sync --extra isal    # + faster ISA-L guest-image zipping
+# or editable with pip:
 #   pip install -e .          # SDK + CLI + infra
 #   pip install -e ".[mcp]"   # + MCP server
 ```
@@ -222,6 +231,11 @@ IaC engine or external CLI is needed.
 Other infra commands: `asb infra refresh`, `asb infra destroy`,
 `asb infra output [NAME]`. Use `asb infra up --rebuild` to force a new MicroVM
 image version even when one is already active.
+
+`asb infra output` prints the current stack's outputs labeled with their
+`project`/`stack` (empty `{}` when nothing is provisioned or after `destroy`).
+With several `sandbox.yaml` files — one project each — pick one with
+`-f <file>` / `-s <stack>`, or list them all with `asb infra output --all`.
 
 ### State file (no account or token required)
 
@@ -413,6 +427,12 @@ The MCP server ships in the optional **`mcp` extra**. It **must** be installed �
 without it `asb mcp` exits immediately and the client reports
 **"Failed to connect"**. Install it one of these ways:
 
+**From PyPI:**
+
+```bash
+pip install "asbox[mcp]"
+```
+
 **Source checkout (development):**
 
 ```bash
@@ -555,6 +575,8 @@ metadata (`truncated`, `total_bytes`, `returned_bytes`) when shortened.
 | --- | --- |
 | `runtime_check` | Check boto3, the `lambda-microvms` client, AWS credentials, and resolved image/role ARNs |
 | `runtime_install` | Explain how to provision the backend (`asb infra up`); reports current status |
+| `infra_outputs` | Pull image/role/region/egress from `asb infra` outputs (labeled with `project`/`stack`) so you needn't paste them; target a stack with `project=` / `setup_file=` |
+| `infra_list` | List every provisioned `project/stack` in local state (for multi-`sandbox.yaml` setups) |
 
 **Sandbox Lifecycle**
 
@@ -622,6 +644,7 @@ metadata (`truncated`, `total_bytes`, `returned_bytes`) when shortened.
 | URI | Description |
 | --- | --- |
 | `agent-sandbox://runtime` | Runtime/config status |
+| `agent-sandbox://infra` | Resolved `asb infra` outputs (image/role/region/egress, labeled with project) |
 | `agent-sandbox://sandboxes` | Current sandbox inventory |
 | `agent-sandbox://images` | Current account image inventory |
 | `agent-sandbox://policy` | Effective host-path and dangerous-operation policy |

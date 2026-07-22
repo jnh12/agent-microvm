@@ -81,6 +81,13 @@ class Config:
             "egress_network_connector_arn"
         )
 
+    def build_bucket(self) -> str | None:
+        return _infra_outputs().get("build_bucket")
+
+    def infra_outputs(self) -> dict:
+        """Copy of the best-effort ``asb infra`` outputs (never raises)."""
+        return dict(_infra_outputs())
+
     def host_path_allowed(self, path: str) -> bool:
         """Whether a host path is permitted for host<->sandbox copy operations."""
         if self.host_path_policy == POLICY_UNRESTRICTED:

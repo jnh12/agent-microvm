@@ -22,6 +22,19 @@ def test_state_roundtrip_and_managed_flags(tmp_path):
     assert reloaded.outputs["image_arn"] == "arn:img"
 
 
+def test_list_stacks(tmp_path):
+    path = tmp_path / "infra-state.json"
+    store = InfraStateStore(path=path)
+    assert store.list_stacks() == []
+    for project, stack in [("proj-a", "dev"), ("proj-b", "prod")]:
+        state = store.load(project, stack)
+        state.outputs = {"image_arn": f"arn:{project}"}
+        store.save(state)
+
+    pairs = set(InfraStateStore(path=path).list_stacks())
+    assert pairs == {("proj-a", "dev"), ("proj-b", "prod")}
+
+
 def test_state_clear(tmp_path):
     path = tmp_path / "infra-state.json"
     store = InfraStateStore(path=path)

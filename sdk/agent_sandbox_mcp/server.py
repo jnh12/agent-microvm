@@ -31,8 +31,10 @@ INSTRUCTIONS = (
     "Isolated microVM sandboxes on AWS Lambda MicroVMs. Use these tools to run "
     "code and manage files INSIDE sandboxes instead of on the host: `sandbox_run` "
     "for one-off commands in an ephemeral VM; `sandbox_create` then `sandbox_exec`/"
-    "`sandbox_shell` for persistent work; `sandbox_fs_*` for files. Every tool "
-    "returns a JSON envelope {ok, data|error}."
+    "`sandbox_shell` for persistent work; `sandbox_fs_*` for files. Image/role/region "
+    "are auto-wired from `asb infra` outputs, so don't ask the user to paste them — "
+    "call `infra_outputs` to pull the resolved values. Every tool returns a JSON "
+    "envelope {ok, data|error}."
 )
 
 

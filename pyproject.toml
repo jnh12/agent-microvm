@@ -1,7 +1,8 @@
 [project]
 name = "asbox"
 version = "0.2.1"
-description = "Embeddable Python SDK + CLI for isolated microVM sandboxes on AWS Lambda MicroVMs (a Python fork of microsandbox concepts)."
+description = "AI agent sandboxes on AWS Lambda MicroVMs: Python SDK, CLI, and MCP server for isolated code execution."
+keywords = ["ai-agents", "sandbox", "code-execution", "microvm", "aws", "mcp"]
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -14,6 +15,12 @@ dependencies = [
     # PyYAML is required to parse sandbox.yaml.
     "pyyaml>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/jnh12/agent-microvm"
+Documentation = "https://github.com/jnh12/agent-microvm/blob/main/docs/index.md"
+Repository = "https://github.com/jnh12/agent-microvm"
+Issues = "https://github.com/jnh12/agent-microvm/issues"
 
 [project.optional-dependencies]
 # Infra ships in the core dependencies now; this extra is kept as a no-op so

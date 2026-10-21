@@ -1,14 +1,51 @@
-# agent-microvm
+# agent-microvm — AI agent sandboxes on AWS
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
-Easy, fast, isolated **microVM sandboxes** for untrusted workloads (AI agents,
-user code, CI jobs), backed by [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
-and provisioned with **bare `boto3`** (no external IaC engine required).
+Run **AI agents and untrusted code** in isolated microVM sandboxes in your own
+AWS account. Use the **Python SDK, CLI, or MCP server** to execute Python and
+shell commands, manage files, and give each agent its own environment.
+Backed by [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
+and provisioned with `boto3`, without an external IaC engine.
+
+**One project, three entry points:** install `asbox` from PyPI, import
+`agent_sandbox` in Python, or run the `asb` CLI. The source repository is
+`agent-microvm`.
 
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
+
+## Quickstart
+
+Requires Python 3.11+, configured AWS credentials, and an AWS CLI/service region
+with Lambda MicroVMs support. Provisioning creates billable AWS resources.
+See [prerequisites](#prerequisites) and the [permissions and cleanup guide](docs/aws-permissions-costs-cleanup.md).
+
+```bash
+pip install "asbox[mcp]"
+asb infra init
+# Review sandbox.yaml and choose your AWS region before provisioning.
+asb infra preview
+asb infra up
+asb create hello
+asb exec hello -- python -c "print('Hello from an AWS sandbox')"
+asb rm hello
+```
+
+Expected command output includes `Hello from an AWS sandbox`.
+Removing the sandbox leaves the shared backend available for your next session.
+
+## Guides
+
+- [Run untrusted Python code in an AWS sandbox](docs/run-untrusted-python.md)
+- [Connect Claude Code and Cursor through MCP](docs/mcp-sandbox.md)
+- [Compare agent-microvm, E2B, and microsandbox](docs/compare-sandboxes.md)
+- [AWS sandbox permissions, costs, and cleanup](docs/aws-permissions-costs-cleanup.md)
+
+This is an AWS-backed runtime, not a local/offline VM runner or a drop-in E2B
+SDK replacement. Check the [current limitations](#status--not-yet-implemented)
+before choosing it for interactive workloads.
 
 ## Demo
 

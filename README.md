@@ -4,7 +4,7 @@
 
 # agent-microvm
 
-**Isolated AWS microVM sandboxes for AI agents and code execution.**
+**Isolated AWS microVM sandboxes for AI agents.**
 
 Python SDK · CLI · MCP server · AWS microVMs
 

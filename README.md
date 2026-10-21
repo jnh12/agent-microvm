@@ -1,4 +1,4 @@
-# agent-sandbox-os
+# agent-microvm
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -26,7 +26,7 @@ forward` the port to localhost and `curl` it:
 
 ![Creating a sandbox, serving FastAPI from it, and forwarding the port to localhost](demo/02-sandbox.gif)
 
-## Why agent-sandbox-os?
+## Why agent-microvm?
 
 Agentic workloads run **untrusted, model-generated code**. The agent decides at
 runtime what to execute — shell out, install a package, hit the network — so the
@@ -37,7 +37,7 @@ own VM fleet to get real isolation is a lot of undifferentiated ops work.
 [AWS Lambda MicroVMs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html)
 give each sandbox a **Firecracker microVM** with hardware-virtualized, VM-level
 isolation while staying **serverless** — no clusters, nodes, or capacity to
-manage. `agent-sandbox-os` wraps that backend so an agent can treat a sandbox as
+manage. `agent-microvm` wraps that backend so an agent can treat a sandbox as
 a disposable tool:
 
 - **Safe by construction** — every command runs in a per-session microVM,
@@ -106,7 +106,7 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 ## Contents
 
 - [Demo](#demo)
-- [Why agent-sandbox-os?](#why-agent-sandbox-os)
+- [Why agent-microvm?](#why-agent-microvm)
   - [Use cases](#use-cases)
 - [Components](#components)
 - [Architecture](#architecture)
@@ -182,7 +182,7 @@ Or work from a clone with [`uv`](https://docs.astral.sh/uv/) (recommended for de
 
 ```bash
 git clone https://github.com/jnh12/agent-microvm.git
-cd agent-sandbox-os
+cd agent-microvm
 
 uv sync                 # SDK + CLI + infra
 uv sync --extra mcp     # + MCP server (FastMCP)
@@ -213,7 +213,7 @@ asb infra up              # create/update; prints outputs (image_arn, role, ...)
 `sandbox.yaml` (created by `asb infra init`):
 
 ```yaml
-project: agent-sandbox-os
+project: agent-microvm
 stack: dev
 region: us-east-1
 
@@ -431,7 +431,7 @@ see [Configuration](#configuration) under the MCP section below.
 
 ## Use it from an AI agent (MCP)
 
-`agent-sandbox-os` ships an [MCP](https://modelcontextprotocol.io/) server
+`agent-microvm` ships an [MCP](https://modelcontextprotocol.io/) server
 (`agent_sandbox_mcp`) that lets AI agents create isolated microVM sandboxes,
 execute code, manage files, read logs, and monitor resources. It mirrors the
 tool-naming conventions and response patterns of
@@ -494,7 +494,7 @@ client makes easiest:
 
 All the client snippets below use `asb mcp`. If your MCP client runs in a
 different environment than your shell (so `asb` isn't on its `PATH`), swap in the
-absolute path to `asb`, or use `uv run --directory /path/to/agent-sandbox-os asb
+absolute path to `asb`, or use `uv run --directory /path/to/agent-microvm asb
 mcp`. Wire the required ARNs through the client's `env` block when they aren't
 already exported, as shown in the generic example.
 

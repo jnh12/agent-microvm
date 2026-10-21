@@ -1,4 +1,4 @@
-# Contributing to agent-sandbox-os
+# Contributing to agent-microvm
 
 Thanks for your interest in contributing! This guide covers how to set up a
 development environment, run the tests and linter, and open a pull request.
@@ -14,7 +14,7 @@ development environment, run the tests and linter, and open a pull request.
 
 ```bash
 git clone https://github.com/jnh12/agent-microvm.git
-cd agent-sandbox-os
+cd agent-microvm
 
 uv sync --extra dev --extra mcp   # SDK + CLI + pytest/ruff + infra deps + MCP server
 ```

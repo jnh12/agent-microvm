@@ -18,15 +18,13 @@ Python SDK · CLI · MCP server · AWS microVMs
 </div>
 
 Easy, fast, isolated **microVM sandboxes** for untrusted workloads (AI agents,
-user code, CI jobs), backed by [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
+user code, CI jobs) using [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
 and provisioned with **bare `boto3`** (no external IaC engine required).
 
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 
 ## Demo
-
-Both recordings are unedited captures of the real CLI against real AWS.
 
 **Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
 `sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the

@@ -1,18 +1,30 @@
+<div align="center">
+
+<img src="demo/header.gif" alt="A pixel robot enthusiastically shovels sand next to a laptop and a rubber duck inside its own tiny sandbox." width="768">
+
 # agent-microvm
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+**Isolated AWS microVM sandboxes for AI agents.**
+
+Python SDK · CLI · MCP server · AWS microVMs
+
+[![GitHub stars](https://img.shields.io/github/stars/jnh12/agent-microvm?style=flat&color=f6c85f)](https://github.com/jnh12/agent-microvm/stargazers)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-71d6c5)](LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/vmnest?color=8bb8f8)](https://pypi.org/project/vmnest/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-8bb8f8)](https://www.python.org/downloads/)
+
+[Getting started](#1-install-the-sdkcli) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
+
+</div>
 
 Easy, fast, isolated **microVM sandboxes** for untrusted workloads (AI agents,
-user code, CI jobs), backed by [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
+user code, CI jobs) using [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
 and provisioned with **bare `boto3`** (no external IaC engine required).
 
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 
 ## Demo
-
-Both recordings are unedited captures of the real CLI against real AWS.
 
 **Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
 `sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
@@ -35,7 +47,7 @@ own VM fleet to get real isolation is a lot of undifferentiated ops work.
 [AWS Lambda MicroVMs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html)
 give each sandbox a **Firecracker microVM** with hardware-virtualized, VM-level
 isolation while staying **serverless** — no clusters, nodes, or capacity to
-manage. `agent-microvm` wraps that backend so an agent can treat a sandbox as
+manage. `vmnest` wraps that backend so an agent can treat a sandbox as
 a disposable tool:
 
 - **Safe by construction** — every command runs in a per-session microVM,
@@ -210,7 +222,7 @@ vmnest infra up              # create/update; prints outputs (image_arn, role, .
 `sandbox.yaml` (created by `vmnest infra init`):
 
 ```yaml
-project: agent-microvm
+project: vmnest
 stack: dev
 region: us-east-1
 
@@ -428,7 +440,7 @@ see [Configuration](#configuration) under the MCP section below.
 
 ## Use it from an AI agent (MCP)
 
-`agent-microvm` ships an [MCP](https://modelcontextprotocol.io/) server
+`vmnest` ships an [MCP](https://modelcontextprotocol.io/) server
 (`agent_sandbox_mcp`) that lets AI agents create isolated microVM sandboxes,
 execute code, manage files, read logs, and monitor resources. It mirrors the
 tool-naming conventions and response patterns of

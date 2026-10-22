@@ -50,7 +50,7 @@ def build_server() -> FastMCP:
             log.info("shutting down: closing sandbox clients")
             await registry.aclose()
 
-    mcp = FastMCP("agent-sandbox", instructions=INSTRUCTIONS, lifespan=lifespan)
+    mcp = FastMCP("vmnest", instructions=INSTRUCTIONS, lifespan=lifespan)
     register_all(mcp, registry, config)
     resources.register(mcp, registry, config)
     return mcp

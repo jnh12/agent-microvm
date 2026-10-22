@@ -230,7 +230,7 @@ def load_setup(path: str | os.PathLike[str] | None = None) -> InfraConfig:
     path = Path(path) if path is not None else _default_setup_path()
     if not path.is_file():
         raise SetupError(
-            f"config file not found: {path}. Run `asb infra init` to scaffold a "
+            f"config file not found: {path}. Run `vmnest infra init` to scaffold a "
             "sandbox.yaml."
         )
 
@@ -250,7 +250,7 @@ def _resolve_setup_paths(paths: list[str] | None) -> list[Path]:
         default = _default_setup_path()
         if not default.is_file():
             raise SetupError(
-                f"config file not found: {default}. Run `asb infra init` to "
+                f"config file not found: {default}. Run `vmnest infra init` to "
                 "scaffold a sandbox.yaml."
             )
         return [default]

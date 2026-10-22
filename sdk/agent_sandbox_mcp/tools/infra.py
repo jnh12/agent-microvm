@@ -1,9 +1,9 @@
-"""Infra tools: surface `asb infra` outputs so sandbox details need not be pasted.
+"""Infra tools: surface `vmnest infra` outputs so sandbox details need not be pasted.
 
 `sandbox_create` / `sandbox_run` already fall back to these outputs when the
 `image` / `role` / `egress` arguments are omitted (see
 :mod:`agent_sandbox_mcp.session`), but the model can't *see* that wiring — so it
-tends to ask the user to paste `asb infra` output. `infra_outputs` makes the
+tends to ask the user to paste `vmnest infra` output. `infra_outputs` makes the
 resolved values explicit, including the **project name** they belong to, so that
 with several `sandbox.yaml` files (each its own project) the model can pull the
 right image ARN / execution role / region for the project it wants and pass them
@@ -111,11 +111,11 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         project: str | None = None,
         stack: str | None = None,
     ) -> dict:
-        """Pull sandbox provisioning details from `asb infra` outputs.
+        """Pull sandbox provisioning details from `vmnest infra` outputs.
 
         Call this before `sandbox_create` / `sandbox_run` when the user hasn't
         supplied an image ARN, execution role, region, or egress connector — the
-        values are auto-wired from `asb infra up` (or the corresponding env vars),
+        values are auto-wired from `vmnest infra up` (or the corresponding env vars),
         so there's no need to ask the user to paste them.
 
         With multiple `sandbox.yaml` files (one project each), target a specific
@@ -133,7 +133,7 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         """List every provisioned infra stack (project/stack) in local state.
 
         Use this to discover which `sandbox.yaml` projects have been brought up
-        with `asb infra up`, then call `infra_outputs(project=...)` to fetch the
+        with `vmnest infra up`, then call `infra_outputs(project=...)` to fetch the
         image/role/region for the one you want.
         """
         from agent_sandbox.infra.state import InfraStateStore

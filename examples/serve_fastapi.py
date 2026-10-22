@@ -15,8 +15,8 @@ End-to-end test of the "run a web app in the box, reach it from my laptop" flow:
 
 Requires deployed infra (see README):
 
-    export AGENT_SANDBOX_IMAGE_ARN=$(asb infra output image_arn)
-    export AGENT_SANDBOX_EXECUTION_ROLE_ARN=$(asb infra output execution_role_arn)
+    export AGENT_SANDBOX_IMAGE_ARN=$(vmnest infra output image_arn)
+    export AGENT_SANDBOX_EXECUTION_ROLE_ARN=$(vmnest infra output execution_role_arn)
     python examples/serve_fastapi.py
 
 Then open http://localhost:8000/docs in your browser, or:

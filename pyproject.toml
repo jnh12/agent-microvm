@@ -1,6 +1,6 @@
 [project]
-name = "asbox"
-version = "0.2.1"
+name = "vmnest"
+version = "0.1.0"
 description = "Embeddable Python SDK + CLI for isolated microVM sandboxes on AWS Lambda MicroVMs (a Python fork of microsandbox concepts)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,18 +15,23 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/jnh12/vmnest"
+Repository = "https://github.com/jnh12/vmnest"
+Issues = "https://github.com/jnh12/vmnest/issues"
+
 [project.optional-dependencies]
 # Infra ships in the core dependencies now; this extra is kept as a no-op so
-# `pip install asbox[infra]` continues to resolve.
+# `pip install vmnest[infra]` continues to resolve.
 infra = []
 # Optional ISA-L accelerated DEFLATE for faster guest-image zipping.
 # The zip helper degrades to stdlib zlib when this is absent, so this is opt-in.
 isal = [
     "isal>=1.6",
 ]
-# MCP support stays opt-in: install with `asbox[mcp]`.
+# MCP support stays opt-in: install with `vmnest[mcp]`.
 mcp = [
-    "mcp>=1.2",
+    "mcp>=1.2,<2",
 ]
 dev = [
     "pytest>=8.0",
@@ -36,8 +41,8 @@ dev = [
 ]
 
 [project.scripts]
-asb = "agent_sandbox.cli.main:app"
-agent-sandbox-mcp = "agent_sandbox_mcp.server:main"
+vmnest = "agent_sandbox.cli.main:app"
+vmnest-mcp = "agent_sandbox_mcp.server:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -48,7 +53,7 @@ packages = ["sdk/agent_sandbox", "sdk/agent_sandbox_mcp"]
 exclude = ["**/__pycache__", "**/*.pyc"]
 
 # Bundle the guest image source (Dockerfile + agentd) into the package so a
-# `pip install asbox` can build a MicroVM image without a repo
+# `pip install vmnest` can build a MicroVM image without a repo
 # checkout. Resolved at runtime via agent_sandbox.guest_source; a user-provided
 # ./guest (or an explicit path) still takes precedence.
 [tool.hatch.build.targets.wheel.force-include]

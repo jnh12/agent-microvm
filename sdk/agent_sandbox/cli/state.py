@@ -3,7 +3,7 @@
 AWS Lambda MicroVMs has no notion of a human-friendly sandbox name, so the CLI
 keeps a small JSON store (default ``~/.agent_sandbox/state.json``) mapping
 ``name -> {microvm_id, endpoint, image_arn, region}``. This is what lets
-``asb create --name app`` and a later ``asb exec app`` (a separate process)
+``vmnest create --name app`` and a later ``vmnest exec app`` (a separate process)
 resolve to the same MicroVM.
 """
 

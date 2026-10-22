@@ -1,4 +1,4 @@
-"""``asb`` CLI: an msb-style interface over the agent_sandbox SDK.
+"""``vmnest`` CLI: an msb-style interface over the agent_sandbox SDK.
 
 Every command is a thin wrapper over :class:`agent_sandbox.Sandbox` and the
 control plane. Named sandboxes are tracked in a local :class:`StateStore`.
@@ -23,8 +23,8 @@ from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
-    name="asb",
-    help="Agent Sandbox: isolated microVM sandboxes on AWS Lambda MicroVMs.",
+    name="vmnest",
+    help="VMNest: isolated microVM sandboxes on AWS Lambda MicroVMs.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -90,7 +90,7 @@ def _infra_outputs() -> dict:
 def _resolve_image(image: str | None) -> str:
     resolved = image or os.environ.get(ENV_IMAGE_ARN) or _infra_outputs().get("image_arn")
     if not resolved:
-        _fail(f"--image is required (or set ${ENV_IMAGE_ARN}, or run `asb infra up`).")
+        _fail(f"--image is required (or set ${ENV_IMAGE_ARN}, or run `vmnest infra up`).")
     return resolved  # type: ignore[return-value]
 
 
@@ -99,7 +99,7 @@ def _resolve_role(role: str | None) -> str:
         role or os.environ.get(ENV_ROLE_ARN) or _infra_outputs().get("execution_role_arn")
     )
     if not resolved:
-        _fail(f"--role is required (or set ${ENV_ROLE_ARN}, or run `asb infra up`).")
+        _fail(f"--role is required (or set ${ENV_ROLE_ARN}, or run `vmnest infra up`).")
     return resolved  # type: ignore[return-value]
 
 
@@ -119,7 +119,7 @@ def _resolve_egress_connectors(
         if not arn:
             _fail(
                 "--egress given but no egress connector in infra outputs. "
-                "Configure network.egress in sandbox.yaml and run `asb infra up`, "
+                "Configure network.egress in sandbox.yaml and run `vmnest infra up`, "
                 "or pass --egress-connector <arn>."
             )
         return [arn]
@@ -203,10 +203,10 @@ def run(
 ) -> None:
     """Boot an ephemeral sandbox, run a command, then terminate it."""
     if not cmd:
-        _fail("provide a command after `--`, e.g. asb run <arn> -- python -c 'print(1)'")
+        _fail("provide a command after `--`, e.g. vmnest run <arn> -- python -c 'print(1)'")
     role_arn = _resolve_role(role)
     egress_connectors = _resolve_egress_connectors(egress_connector, egress)
-    ephemeral = f"asb-run-{secrets.token_hex(4)}"
+    ephemeral = f"vmnest-run-{secrets.token_hex(4)}"
 
     async def _do() -> None:
         sandbox = await Sandbox.create(
@@ -235,7 +235,7 @@ def exec(
 ) -> None:
     """Execute a command in a running sandbox."""
     if not cmd:
-        _fail("provide a command after `--`, e.g. asb exec app -- python -c 'print(1)'")
+        _fail("provide a command after `--`, e.g. vmnest exec app -- python -c 'print(1)'")
     rec = _require_record(name)
 
     async def _do() -> None:
@@ -253,7 +253,7 @@ def stop(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
 ) -> None:
-    """Suspend a sandbox (preserves memory/disk; resume with `asb start`)."""
+    """Suspend a sandbox (preserves memory/disk; resume with `vmnest start`)."""
     rec = _require_record(name)
 
     async def _do() -> None:
@@ -498,8 +498,8 @@ def image_rm(
 # -- helpers ---------------------------------------------------------------
 
 
-# `asb forward` polls the control plane on this cadence so it can disconnect
-# itself once the MicroVM is no longer RUNNING (e.g. after `asb stop`/`asb rm`).
+# `vmnest forward` polls the control plane on this cadence so it can disconnect
+# itself once the MicroVM is no longer RUNNING (e.g. after `vmnest stop`/`vmnest rm`).
 _FORWARD_POLL_INTERVAL = 5.0
 _FORWARD_TOKEN_REFRESH = 25 * 60
 _FORWARD_MAX_STATUS_FAILURES = 3
@@ -763,7 +763,7 @@ def _print_cw_metrics(rec: SandboxRecord, region: str | None) -> None:
 SETUP_TEMPLATE = """\
 # agent-sandbox-os infrastructure config (sandbox.yaml).
 # Each resource is reuse-or-create: set an existing id/arn to reuse it, or leave
-# it empty to have `asb infra up` create it.
+# it empty to have `vmnest infra up` create it.
 
 project: agent-sandbox-os
 stack: dev
@@ -1107,7 +1107,7 @@ def forward(
         while True:
             time.sleep(interval)
             # Auto-disconnect once the MicroVM is no longer running (e.g. the
-            # sandbox was suspended by `asb stop` or terminated by `asb rm` in
+            # sandbox was suspended by `vmnest stop` or terminated by `vmnest rm` in
             # another terminal).
             try:
                 info = _run(cp.get_microvm(rec.microvm_id))
@@ -1121,7 +1121,7 @@ def forward(
             except SandboxError:
                 # A single blip shouldn't drop a healthy tunnel, but repeated
                 # failures usually mean the VM is gone (get_microvm raises after
-                # `asb rm`), so give up after a few consecutive errors.
+                # `vmnest rm`), so give up after a few consecutive errors.
                 status_failures += 1
                 if status_failures >= _FORWARD_MAX_STATUS_FAILURES:
                     console.print(
@@ -1143,12 +1143,12 @@ def forward(
 
 @app.command()
 def mcp() -> None:
-    """Run the agent-sandbox MCP server (FastMCP) over stdio.
+    """Run the VMNest MCP server (FastMCP) over stdio.
 
     Exposes sandbox lifecycle, exec, filesystem, logs, metrics, and image tools
     to any MCP client. Register with Claude Code via:
 
-        claude mcp add agent-sandbox -- asb mcp
+        claude mcp add agent-sandbox -- vmnest mcp
     """
     try:
         from agent_sandbox_mcp.server import main as _mcp_main
@@ -1156,7 +1156,7 @@ def mcp() -> None:
         if _is_missing(exc, "agent_sandbox_mcp", "mcp", "fastmcp"):
             _fail(
                 "MCP server not available. Install the `mcp` extra with "
-                r"`pip install asbox\[mcp]` (or `uv pip install -e '.\[mcp]'` "
+                r"`pip install vmnest\[mcp]` (or `uv pip install -e '.\[mcp]'` "
                 "in a source checkout)."
             )
         _fail(

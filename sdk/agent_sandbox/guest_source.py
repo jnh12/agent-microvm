@@ -36,7 +36,7 @@ def bundled_guest_dir() -> str | None:
     1. A wheel install: the ``guest/`` copy force-included into the package as
        ``agent_sandbox/_bundled_guest``.
     2. A source/editable checkout (where force-include never ran): the repo's
-       top-level ``guest/`` sitting next to the ``sdk/`` tree, so ``asb`` works
+       top-level ``guest/`` sitting next to the ``sdk/`` tree, so ``vmnest`` works
        from any directory during development too.
 
     Returns ``None`` when neither exists (or a zipimport loader makes the

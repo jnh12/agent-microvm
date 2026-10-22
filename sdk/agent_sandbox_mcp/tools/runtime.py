@@ -60,7 +60,7 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         """Check whether the agent-sandbox backend is available.
 
         Verifies boto3, the AWS ``lambda-microvms`` control-plane client, AWS
-        credentials, and whether image/role ARNs resolve (env or `asb infra`).
+        credentials, and whether image/role ARNs resolve (env or `vmnest infra`).
         """
         return ok(_check(config))
 
@@ -70,14 +70,14 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         """Explain how to provision the backend.
 
         Unlike a local runtime, this backend runs on AWS Lambda MicroVMs and is
-        provisioned with `asb infra up` (creates the image, execution role, and
+        provisioned with `vmnest infra up` (creates the image, execution role, and
         supporting resources). This tool does not perform installs itself.
         """
         state = _check(config)
         if state["ready"]:
             return ok({"message": "backend already provisioned", "runtime": state})
         return err(
-            "Backend not provisioned. Run `asb infra up` (see repo README) to "
+            "Backend not provisioned. Run `vmnest infra up` (see repo README) to "
             "create the MicroVM image and execution role, or set "
             "$AGENT_SANDBOX_IMAGE_ARN and $AGENT_SANDBOX_EXECUTION_ROLE_ARN.",
             code="not_provisioned",

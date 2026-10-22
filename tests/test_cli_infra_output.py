@@ -1,4 +1,4 @@
-"""Tests for `asb infra output` labeling and `--all` (no AWS needed)."""
+"""Tests for `vmnest infra output` labeling and `--all` (no AWS needed)."""
 
 from __future__ import annotations
 

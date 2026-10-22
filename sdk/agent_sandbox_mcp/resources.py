@@ -31,7 +31,7 @@ SANDBOX_CREATE_SCHEMA = {
         "egress": {
             "type": "boolean",
             "default": False,
-            "description": "Attach the egress connector from setup.yaml / asb infra outputs.",
+            "description": "Attach the egress connector from setup.yaml / vmnest infra outputs.",
         },
     },
     "additionalProperties": False,
@@ -52,7 +52,7 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
 
     @mcp.resource("agent-sandbox://infra")
     async def infra_resource() -> str:
-        """Resolved `asb infra` outputs (image/role/region/egress) for sandboxes."""
+        """Resolved `vmnest infra` outputs (image/role/region/egress) for sandboxes."""
         from agent_sandbox_mcp.tools.infra import build_outputs
 
         return _dumps(build_outputs(config))

@@ -30,11 +30,13 @@ fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 `sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
 role and build bucket:
 
+![Install and provision a sandbox with vmnest](https://raw.githubusercontent.com/jnh12/agent-microvm/main/demo/01-setup.gif)
 
 **Boot a sandbox and serve an app out of it** — `vmnest create` (a ~3 second boot),
 write a FastAPI app into the VM with `vmnest exec`, start uvicorn, then `vmnest
 forward` the port to localhost and `curl` it:
 
+![Run a web app inside a sandbox with vmnest](https://raw.githubusercontent.com/jnh12/agent-microvm/main/demo/02-sandbox.gif)
 
 ## Why agent-microvm?
 

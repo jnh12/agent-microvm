@@ -8,4 +8,4 @@ implemented in Python with FastMCP. See ``README.md`` for the tool catalog and
 the "SDK Gaps" section for reference tools that this backend cannot support.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"

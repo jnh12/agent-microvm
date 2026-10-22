@@ -24,7 +24,7 @@ from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
     name="vmnest",
-    help="Agent Sandbox: isolated microVM sandboxes on AWS Lambda MicroVMs.",
+    help="agent-microvm: isolated microVM sandboxes on AWS Lambda MicroVMs.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -1143,7 +1143,7 @@ def forward(
 
 @app.command()
 def mcp() -> None:
-    """Run the agent-sandbox MCP server (FastMCP) over stdio.
+    """Run the agent-microvm MCP server (FastMCP) over stdio.
 
     Exposes sandbox lifecycle, exec, filesystem, logs, metrics, and image tools
     to any MCP client. Register with Claude Code via:

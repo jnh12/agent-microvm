@@ -1,6 +1,6 @@
 [project]
 name = "vmnest"
-version = "0.2.1"
+version = "0.1.0"
 description = "Embeddable Python SDK + CLI for isolated microVM sandboxes on AWS Lambda MicroVMs (a Python fork of microsandbox concepts)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +15,11 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/jnh12/agent-microvm"
+Repository = "https://github.com/jnh12/agent-microvm"
+Issues = "https://github.com/jnh12/agent-microvm/issues"
+
 [project.optional-dependencies]
 # Infra ships in the core dependencies now; this extra is kept as a no-op so
 # `pip install vmnest[infra]` continues to resolve.
@@ -26,7 +31,7 @@ isal = [
 ]
 # MCP support stays opt-in: install with `vmnest[mcp]`.
 mcp = [
-    "mcp>=1.2",
+    "mcp>=1.2,<2",
 ]
 dev = [
     "pytest>=8.0",

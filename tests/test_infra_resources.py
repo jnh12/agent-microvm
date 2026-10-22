@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import os
 import zipfile
 
 import pytest
@@ -210,7 +209,7 @@ def test_upload_guest_zips_and_uploads(tmp_path):
     # A valid, extractable standard .zip round-trips both files.
     zf = zipfile.ZipFile(io.BytesIO(s3.body))
     assert set(zf.namelist()) == {"Dockerfile", "app.py"}
-    assert zf.read("app.py") == b"print('hi')\n"
+    assert zf.read("app.py") == (tmp_path / "app.py").read_bytes()
 
 
 def test_zip_dir_produces_valid_extractable_zip(tmp_path):
@@ -224,9 +223,9 @@ def test_zip_dir_produces_valid_extractable_zip(tmp_path):
 
     assert zipfile.is_zipfile(io.BytesIO(data))
     zf = zipfile.ZipFile(io.BytesIO(data))
-    assert set(zf.namelist()) == {"a.txt", os.path.join("pkg", "b.txt")}
-    assert zf.read("a.txt") == b"alpha\n"
-    assert zf.read(os.path.join("pkg", "b.txt")) == b"beta\n"
+    assert set(zf.namelist()) == {"a.txt", "pkg/b.txt"}
+    assert zf.read("a.txt") == (tmp_path / "a.txt").read_bytes()
+    assert zf.read("pkg/b.txt") == (sub / "b.txt").read_bytes()
 
 
 if __name__ == "__main__":

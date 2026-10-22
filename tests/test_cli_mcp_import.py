@@ -1,4 +1,4 @@
-"""Tests for `asb mcp` import diagnostics (no AWS, no mcp extra needed).
+"""Tests for `vmnest mcp` import diagnostics (no AWS, no mcp extra needed).
 
 A missing `mcp` extra and an *installed but unloadable* one are different
 failures: the first needs an install hint, the second needs the underlying
@@ -58,8 +58,8 @@ def test_mcp_command_hints_at_the_extra_when_absent(monkeypatch):
     _patch_import(monkeypatch, ModuleNotFoundError("No module named 'mcp'", name="mcp"))
     result = runner.invoke(app, ["mcp"])
     assert result.exit_code == 1
-    # The published distribution is `asbox`; `agent-sandbox-os` does not exist.
-    assert "asbox" in result.output
+    # The published distribution is `vmnest`; `agent-sandbox-os` does not exist.
+    assert "vmnest" in result.output
     assert "agent-sandbox-os" not in result.output
 
 

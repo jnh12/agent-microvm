@@ -22,17 +22,17 @@ from agent_sandbox_mcp.tools import register_all
 
 logging.basicConfig(
     level=logging.INFO,
-    format="[agent-sandbox-mcp] %(levelname)s %(message)s",
+    format="[vmnest-mcp] %(levelname)s %(message)s",
     stream=sys.stderr,
 )
-log = logging.getLogger("agent-sandbox-mcp")
+log = logging.getLogger("vmnest-mcp")
 
 INSTRUCTIONS = (
     "Isolated microVM sandboxes on AWS Lambda MicroVMs. Use these tools to run "
     "code and manage files INSIDE sandboxes instead of on the host: `sandbox_run` "
     "for one-off commands in an ephemeral VM; `sandbox_create` then `sandbox_exec`/"
     "`sandbox_shell` for persistent work; `sandbox_fs_*` for files. Image/role/region "
-    "are auto-wired from `asb infra` outputs, so don't ask the user to paste them — "
+    "are auto-wired from `vmnest infra` outputs, so don't ask the user to paste them — "
     "call `infra_outputs` to pull the resolved values. Every tool returns a JSON "
     "envelope {ok, data|error}."
 )
@@ -50,7 +50,7 @@ def build_server() -> FastMCP:
             log.info("shutting down: closing sandbox clients")
             await registry.aclose()
 
-    mcp = FastMCP("agent-sandbox", instructions=INSTRUCTIONS, lifespan=lifespan)
+    mcp = FastMCP("vmnest", instructions=INSTRUCTIONS, lifespan=lifespan)
     register_all(mcp, registry, config)
     resources.register(mcp, registry, config)
     return mcp

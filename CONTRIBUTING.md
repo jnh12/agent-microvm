@@ -1,4 +1,4 @@
-# Contributing to agent-microvm
+# Contributing to vmnest
 
 Thanks for your interest in contributing! This guide covers how to set up a
 development environment, run the tests and linter, and open a pull request.
@@ -13,8 +13,8 @@ development environment, run the tests and linter, and open a pull request.
 ## Set up a dev environment
 
 ```bash
-git clone https://github.com/jnh12/agent-microvm.git
-cd agent-microvm
+git clone https://github.com/jnh12/vmnest.git
+cd vmnest
 
 uv sync --extra dev --extra mcp   # SDK + CLI + pytest/ruff + infra deps + MCP server
 ```
@@ -68,3 +68,25 @@ avoid filing a public issue.
 
 By contributing, you agree that your contributions will be licensed under the
 [Apache-2.0 License](LICENSE).
+
+## Publishing VMNest
+
+The distribution and CLI are `vmnest`; the standalone MCP launcher is
+`vmnest-mcp`. Python import paths remain `agent_sandbox` and `agent_sandbox_mcp`.
+
+Pushes to `main` and `develop` run tests and build artifacts. To publish, run
+GitHub Actions **Publish** manually, selecting `main` + `pypi` for production,
+or `develop` + `testpypi` for a test release. Update the version in
+`pyproject.toml` and both SDK `__init__.py` files before a new release.
+
+Each index needs its own pending/trusted publisher configured with:
+
+| Field | Value |
+| --- | --- |
+| Project name | `vmnest` |
+| Owner | `jnh12` |
+| Repository | `vmnest` |
+| Workflow | `publish.yml` |
+| Environment | `pypi` or `testpypi`, matching the index |
+
+The publisher uses GitHub OIDC; no long-lived PyPI token is needed.

@@ -1,4 +1,4 @@
-"""Tests for `asb forward`: auto-disconnect status logic and WebSocket relay."""
+"""Tests for `vmnest forward`: auto-disconnect status logic and WebSocket relay."""
 
 from __future__ import annotations
 

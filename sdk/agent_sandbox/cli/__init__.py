@@ -1,1 +1,1 @@
-"""The ``asb`` command-line interface."""
+"""The ``vmnest`` command-line interface."""

@@ -3,7 +3,7 @@
 Configuration mirrors microsandbox-mcp's ``MICROSANDBOX_MCP_*`` namespace, using
 ``AGENT_SANDBOX_MCP_*`` here, and reuses the SDK's existing
 ``AGENT_SANDBOX_IMAGE_ARN`` / ``AGENT_SANDBOX_EXECUTION_ROLE_ARN`` / region env
-vars plus ``asb infra`` output auto-wiring.
+vars plus ``vmnest infra`` output auto-wiring.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ class Config:
         return _infra_outputs().get("build_bucket")
 
     def infra_outputs(self) -> dict:
-        """Copy of the best-effort ``asb infra`` outputs (never raises)."""
+        """Copy of the best-effort ``vmnest infra`` outputs (never raises)."""
         return dict(_infra_outputs())
 
     def host_path_allowed(self, path: str) -> bool:
@@ -138,7 +138,7 @@ def load_config() -> Config:
 
 @lru_cache(maxsize=1)
 def _infra_outputs() -> dict:
-    """Best-effort ``asb infra`` outputs for auto-wiring image/role ARNs.
+    """Best-effort ``vmnest infra`` outputs for auto-wiring image/role ARNs.
 
     Never raises; returns ``{}`` when infra state isn't available so callers
     fall back to env vars.

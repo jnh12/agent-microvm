@@ -2,15 +2,15 @@
 
 <img src="demo/header.gif" alt="A pixel robot enthusiastically shovels sand next to a laptop and a rubber duck inside its own tiny sandbox." width="768">
 
-# agent-microvm
+# VMNest
 
 **Isolated AWS microVM sandboxes for AI agents.**
 
 Python SDK · CLI · MCP server · AWS microVMs
 
-[![GitHub stars](https://img.shields.io/github/stars/jnh12/agent-microvm?style=flat&color=f6c85f)](https://github.com/jnh12/agent-microvm/stargazers)
+[![GitHub stars](https://img.shields.io/github/stars/jnh12/vmnest?style=flat&color=f6c85f)](https://github.com/jnh12/vmnest/stargazers)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-71d6c5)](LICENSE)
-[![PyPI version](https://img.shields.io/pypi/v/asbox?color=8bb8f8)](https://pypi.org/project/asbox/)
+[![PyPI version](https://img.shields.io/pypi/v/vmnest?color=8bb8f8)](https://pypi.org/project/vmnest/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-8bb8f8)](https://www.python.org/downloads/)
 
 [Getting started](#1-install-the-sdkcli) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
@@ -24,21 +24,27 @@ and provisioned with **bare `boto3`** (no external IaC engine required).
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 
+VMNest is a renamed distribution of agent-microvm, maintained at
+[jnh12/vmnest](https://github.com/jnh12/vmnest). The Python imports
+(`agent_sandbox`, `agent_sandbox_mcp`) and existing configuration remain compatible.
+
 ## Demo
 
-**Install, configure, provision** — `uv pip install "asbox[mcp]"`, the whole of
-`sandbox.yaml`, then `asb infra up` building the MicroVM image and wiring up the
+The recordings below show the original `asb` command; use `vmnest` for this distribution.
+
+**Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
+`sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
 role and build bucket:
 
-![Installing asbox and provisioning the MicroVM backend with asb infra up](demo/01-setup.gif)
+![Installing vmnest and provisioning the MicroVM backend with vmnest infra up](demo/01-setup.gif)
 
-**Boot a sandbox and serve an app out of it** — `asb create` (a ~3 second boot),
-write a FastAPI app into the VM with `asb exec`, start uvicorn, then `asb
+**Boot a sandbox and serve an app out of it** — `vmnest create` (a ~3 second boot),
+write a FastAPI app into the VM with `vmnest exec`, start uvicorn, then `vmnest
 forward` the port to localhost and `curl` it:
 
 ![Creating a sandbox, serving FastAPI from it, and forwarding the port to localhost](demo/02-sandbox.gif)
 
-## Why agent-microvm?
+## Why vmnest?
 
 Agentic workloads run **untrusted, model-generated code**. The agent decides at
 runtime what to execute — shell out, install a package, hit the network — so the
@@ -49,7 +55,7 @@ own VM fleet to get real isolation is a lot of undifferentiated ops work.
 [AWS Lambda MicroVMs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html)
 give each sandbox a **Firecracker microVM** with hardware-virtualized, VM-level
 isolation while staying **serverless** — no clusters, nodes, or capacity to
-manage. `agent-microvm` wraps that backend so an agent can treat a sandbox as
+manage. `vmnest` wraps that backend so an agent can treat a sandbox as
 a disposable tool:
 
 - **Safe by construction** — every command runs in a per-session microVM,
@@ -60,7 +66,7 @@ a disposable tool:
   with memory and disk intact.
 - **Serverless economics** — pay for what you use; no idle VM fleet sitting
   between agent runs.
-- **Batteries included** — one `agent_sandbox` SDK + `asb` CLI, a per-sandbox
+- **Batteries included** — one `agent_sandbox` SDK + `vmnest` CLI, a per-sandbox
   HTTPS endpoint, and a built-in **MCP server** so Claude, Cursor, Goose, and
   other agents can create, run, and manage sandboxes as native tools.
 - **No IaC engine** — infrastructure is provisioned with bare `boto3` and tracked
@@ -71,7 +77,7 @@ a disposable tool:
 **Developer workloads that outgrow the laptop.** Multi-agent orchestration is
 memory-hungry — a handful of concurrent agents, each with its own toolchain and
 build tree, will exhaust local RAM long before it exhausts your patience. Each
-sandbox gets its own CPU/memory allocation in AWS (`asb create app --cpus 2 -m
+sandbox gets its own CPU/memory allocation in AWS (`vmnest create app --cpus 2 -m
 2048`), so you scale out by adding microVMs rather than by buying RAM.
 
 **Local coding agents that run unattended.** The agent shells out, installs
@@ -93,13 +99,13 @@ code inside the VM then reads from Secrets Manager, SSM Parameter Store, or S3
 through that role. No long-lived keys travel into the sandbox, and the blast
 radius of a compromised sandbox is whatever that one role allows.
 
-**View a sandbox dev server in your local browser.** `asb forward app -r 8000 -l
+**View a sandbox dev server in your local browser.** `vmnest forward app -r 8000 -l
 8000` runs a local reverse proxy into the VM, so a React, Vite, or FastAPI dev
 server running inside the sandbox opens at `http://localhost:8000`. See
 [Serve a web app from a sandbox](#5-serve-a-web-app-from-a-sandbox).
 
-**Suspend, resume, and terminate out of the box.** `asb stop` suspends with
-memory and disk intact, `asb start` resumes, `asb rm` tears down. A session can
+**Suspend, resume, and terminate out of the box.** `vmnest stop` suspends with
+memory and disk intact, `vmnest start` resumes, `vmnest rm` tears down. A session can
 stay alive across up to **8 hours** of work without you paying for it to idle.
 
 **A sandbox per code session.** Named sandboxes are tracked in local state, so
@@ -107,18 +113,18 @@ several concurrent sessions — one per agent, per branch, per experiment — ea
 get their own microVM, isolated from one another and independently
 suspendable.
 
-**One image, many VMs.** Build the guest image once (`asb image build ./guest`),
+**One image, many VMs.** Build the guest image once (`vmnest image build ./guest`),
 then create as many microVMs from it as you need — different workloads, same
 reproducible base, no rebuild per sandbox.
 
-**One command to stand up the backend.** `asb infra up` provisions the MicroVM
+**One command to stand up the backend.** `vmnest infra up` provisions the MicroVM
 image, execution role, S3 build bucket, and optional network connectors with bare
 `boto3`, recording everything in a local state file.
 
 ## Contents
 
 - [Demo](#demo)
-- [Why agent-microvm?](#why-agent-microvm)
+- [Why vmnest?](#why-vmnest)
   - [Use cases](#use-cases)
 - [Components](#components)
 - [Architecture](#architecture)
@@ -126,7 +132,7 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 - [1. Install the SDK/CLI](#1-install-the-sdkcli)
 - [2. Configure and deploy the infrastructure](#2-configure-and-deploy-the-infrastructure)
 - [3. Use the SDK](#3-use-the-sdk)
-- [4. Use the `asb` CLI](#4-use-the-asb-cli)
+- [4. Use the `vmnest` CLI](#4-use-the-vmnest-cli)
 - [5. Serve a web app from a sandbox](#5-serve-a-web-app-from-a-sandbox)
 - [Environment variables](#environment-variables)
 - [Use it from an AI agent (MCP)](#use-it-from-an-ai-agent-mcp)
@@ -145,16 +151,16 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 | Guest agent | `guest/agentd` — FastAPI **agentd** (exec/fs API on port 8080) plus a **lifecycle-hook** server (port 9000), run together via `agentd.serve` and baked into the MicroVM image |
 | SDK | `agent_sandbox.Sandbox.create(...)` |
 | Transport | `agent_sandbox.agent_client.AgentClient` (HTTPS + `X-aws-proxy-auth`) |
-| CLI | `asb` |
-| Infrastructure | `asb infra` (bare `boto3` provisioner, `agent_sandbox.infra`) driven by `sandbox.yaml`; PyYAML ships in the base install |
-| MCP server | `agent_sandbox_mcp` (FastMCP server, optional `[mcp]` extra, launched with `asb mcp`) |
+| CLI | `vmnest` |
+| Infrastructure | `vmnest infra` (bare `boto3` provisioner, `agent_sandbox.infra`) driven by `sandbox.yaml`; PyYAML ships in the base install |
+| MCP server | `agent_sandbox_mcp` (FastMCP server, optional `[mcp]` extra, launched with `vmnest mcp`) |
 
 ## Architecture
 
 ```mermaid
 graph TD
     subgraph app [Your Application]
-        SDK["agent_sandbox SDK / asb CLI"]
+        SDK["agent_sandbox SDK / vmnest CLI"]
     end
     subgraph aws [lambda-microvms control plane]
         CP["run / suspend / resume / terminate + auth token"]
@@ -176,25 +182,25 @@ graph TD
 - Docker (only to test the guest image locally; the build itself happens in AWS)
 - A region where Lambda MicroVMs is available: `us-east-1`, `us-east-2`, `us-west-2`, `eu-west-1`, `ap-northeast-1`. Pick any of these via `region:` in `sandbox.yaml` or the standard `AWS_DEFAULT_REGION` / `AWS_REGION` environment variable.
 
-No IaC engine or external CLI is required — `asb infra` provisions everything
+No IaC engine or external CLI is required — `vmnest infra` provisions everything
 with `boto3` (a core dependency) and tracks state in a local JSON file.
 
 ## 1. Install the SDK/CLI
 
-The package is published on PyPI as **`asbox`** (the import name and `asb` CLI are
+The package is published on PyPI as **`vmnest`** (the import name and `vmnest` CLI are
 unchanged). Install with `pip`:
 
 ```bash
-pip install asbox            # SDK + CLI + infra (PyYAML is a base dependency)
-pip install "asbox[mcp]"     # + MCP server (FastMCP) — see the MCP section below
-pip install "asbox[isal]"    # + faster ISA-L guest-image zipping (optional accelerator)
+pip install vmnest            # SDK + CLI + infra (PyYAML is a base dependency)
+pip install "vmnest[mcp]"     # + MCP server (FastMCP) — see the MCP section below
+pip install "vmnest[isal]"    # + faster ISA-L guest-image zipping (optional accelerator)
 ```
 
 Or work from a clone with [`uv`](https://docs.astral.sh/uv/) (recommended for development):
 
 ```bash
-git clone https://github.com/jnh12/agent-microvm.git
-cd agent-microvm
+git clone https://github.com/jnh12/vmnest.git
+cd vmnest
 
 uv sync                 # SDK + CLI + infra
 uv sync --extra mcp     # + MCP server (FastMCP)
@@ -204,9 +210,9 @@ uv sync --extra isal    # + faster ISA-L guest-image zipping
 #   pip install -e ".[mcp]"   # + MCP server
 ```
 
-This installs the `asb` command on your `PATH`. Verify with `asb --help`.
+This installs the `vmnest` command on your `PATH`. Verify with `vmnest --help`.
 
-> Infrastructure support (`asb infra`, reading `sandbox.yaml`) is included in the
+> Infrastructure support (`vmnest infra`, reading `sandbox.yaml`) is included in the
 > base install — no extra needed. The legacy `[infra]` extra still resolves but
 > is now an empty no-op.
 
@@ -214,18 +220,18 @@ This installs the `asb` command on your `PATH`. Verify with `asb --help`.
 
 All infrastructure variables live in a single `sandbox.yaml`. Each resource is
 **reuse-or-create**: set an existing id/arn to reuse it, or leave it empty to
-have `asb infra` create it.
+have `vmnest infra` create it.
 
 ```bash
-asb infra init            # scaffold sandbox.yaml (edit as needed)
-asb infra preview         # see what will change
-asb infra up              # create/update; prints outputs (image_arn, role, ...)
+vmnest infra init            # scaffold sandbox.yaml (edit as needed)
+vmnest infra preview         # see what will change
+vmnest infra up              # create/update; prints outputs (image_arn, role, ...)
 ```
 
-`sandbox.yaml` (created by `asb infra init`):
+`sandbox.yaml` (created by `vmnest infra init`):
 
 ```yaml
-project: agent-microvm
+project: vmnest
 stack: dev
 region: us-east-1
 
@@ -253,45 +259,45 @@ network:                        # OPTIONAL. Omit entirely for default public egr
     operator_role_arn: ""       # set -> reuse; empty -> create NetworkConnectorOperatorRole
 ```
 
-`asb infra` is a bare-`boto3` provisioner (under `agent_sandbox.infra`); each
+`vmnest infra` is a bare-`boto3` provisioner (under `agent_sandbox.infra`); each
 resource is created idempotently and recorded in a local JSON state file, so no
 IaC engine or external CLI is needed.
 
-Other infra commands: `asb infra refresh`, `asb infra destroy`,
-`asb infra output [NAME]`. Use `asb infra up --rebuild` to force a new MicroVM
+Other infra commands: `vmnest infra refresh`, `vmnest infra destroy`,
+`vmnest infra output [NAME]`. Use `vmnest infra up --rebuild` to force a new MicroVM
 image version even when one is already active.
 
-`asb infra output` prints the current stack's outputs labeled with their
+`vmnest infra output` prints the current stack's outputs labeled with their
 `project`/`stack` (empty `{}` when nothing is provisioned or after `destroy`).
 With several `sandbox.yaml` files — one project each — pick one with
-`-f <file>` / `-s <stack>`, or list them all with `asb infra output --all`.
+`-f <file>` / `-s <stack>`, or list them all with `vmnest infra output --all`.
 
 ### State file (no account or token required)
 
-`asb infra` records what it created — and whether each resource was created by
+`vmnest infra` records what it created — and whether each resource was created by
 it (managed) versus reused from your `sandbox.yaml` — in a local JSON file at
 `~/.agent_sandbox/infra-state.json` (override with `AGENT_SANDBOX_INFRA_STATE`).
-`asb infra destroy` only tears down resources it manages, so reused resources
+`vmnest infra destroy` only tears down resources it manages, so reused resources
 are left untouched. This file also holds the outputs (`image_arn`,
 `execution_role_arn`, `build_bucket`) that the SDK/CLI auto-wire from.
 
 ## 3. Use the SDK
 
-After `asb infra up`, the CLI auto-reads `image_arn`, `execution_role_arn`, and
+After `vmnest infra up`, the CLI auto-reads `image_arn`, `execution_role_arn`, and
 any network outputs from the stack. For the raw SDK you can either rely on that
 or export env vars explicitly:
 
 ```bash
-export AGENT_SANDBOX_IMAGE_ARN=$(asb infra output image_arn)
-export AGENT_SANDBOX_EXECUTION_ROLE_ARN=$(asb infra output execution_role_arn)
+export AGENT_SANDBOX_IMAGE_ARN=$(vmnest infra output image_arn)
+export AGENT_SANDBOX_EXECUTION_ROLE_ARN=$(vmnest infra output execution_role_arn)
 python examples/run_code.py   # -> Hello from a microVM!
 ```
 
 On Windows PowerShell, use `$env:` instead of `export`:
 
 ```powershell
-$env:AGENT_SANDBOX_IMAGE_ARN = (asb infra output image_arn)
-$env:AGENT_SANDBOX_EXECUTION_ROLE_ARN = (asb infra output execution_role_arn)
+$env:AGENT_SANDBOX_IMAGE_ARN = (vmnest infra output image_arn)
+$env:AGENT_SANDBOX_EXECUTION_ROLE_ARN = (vmnest infra output execution_role_arn)
 python examples/run_code.py
 ```
 
@@ -308,92 +314,92 @@ async def main():
 asyncio.run(main())
 ```
 
-## 4. Use the `asb` CLI
+## 4. Use the `vmnest` CLI
 
-After `asb infra up`, `--image`/`--role` are auto-read from the stack, so most
+After `vmnest infra up`, `--image`/`--role` are auto-read from the stack, so most
 commands need no flags:
 
 ```bash
 # lifecycle (a named sandbox tracked in local state)
-asb create app                    # auto-wired image/role from infra outputs
-asb exec app -- python -c "import this"
-asb ls                            # all tracked sandboxes + live status
-asb ps app                        # one sandbox's status
-asb inspect app                   # full MicroVM info as JSON
-asb logs app                      # CloudWatch logs (best-effort)
-asb metrics app                   # CloudWatch metrics (best-effort)
-asb stop app                      # suspend (memory/disk preserved)
-asb start app                     # resume
-asb rm app                        # terminate + drop from local state
+vmnest create app                    # auto-wired image/role from infra outputs
+vmnest exec app -- python -c "import this"
+vmnest ls                            # all tracked sandboxes + live status
+vmnest ps app                        # one sandbox's status
+vmnest inspect app                   # full MicroVM info as JSON
+vmnest logs app                      # CloudWatch logs (best-effort)
+vmnest metrics app                   # CloudWatch metrics (best-effort)
+vmnest stop app                      # suspend (memory/disk preserved)
+vmnest start app                     # resume
+vmnest rm app                        # terminate + drop from local state
 
 # ephemeral one-shot (image ARN is a required positional — not auto-wired)
-asb run "$(asb infra output image_arn)" -- python -c "print('one-shot')"
+vmnest run "$(vmnest infra output image_arn)" -- python -c "print('one-shot')"
 
 # serve a port from inside the sandbox on localhost (see section 5)
-asb forward app --remote-port 8000 --local-port 8000
+vmnest forward app --remote-port 8000 --local-port 8000
 
 # images
-asb image build ./guest --name my-guest --bucket "$(asb infra output build_bucket)"
-asb image ls                      # your images (--managed for AWS base images, --json for raw)
-asb image rm <image-arn>
+vmnest image build ./guest --name my-guest --bucket "$(vmnest infra output build_bucket)"
+vmnest image ls                      # your images (--managed for AWS base images, --json for raw)
+vmnest image rm <image-arn>
 
 # infrastructure
-asb infra init | preview | up | refresh | destroy | output [NAME]
+vmnest infra init | preview | up | refresh | destroy | output [NAME]
 
 # run the MCP server over stdio (see the MCP section)
-asb mcp
+vmnest mcp
 ```
 
 **Common flags**
 
-- `asb create` / `asb run`: `--image/-i`, `--role`, `--cpus`, `--memory/-m`
+- `vmnest create` / `vmnest run`: `--image/-i`, `--role`, `--cpus`, `--memory/-m`
   (default 512), `--region`, and `--egress-connector <arn>` / `--egress/-e`
   (attach the egress connector from infra outputs).
 - Every lifecycle/status command takes `--region`.
-- `asb logs`: `--log-group` to override the CloudWatch group.
-- `asb image ls`: `--managed` (AWS base images), `--json` (raw output).
-- `asb forward`: `--remote-port/-r` (required), `--local-port/-l`,
+- `vmnest logs`: `--log-group` to override the CloudWatch group.
+- `vmnest image ls`: `--managed` (AWS base images), `--json` (raw output).
+- `vmnest forward`: `--remote-port/-r` (required), `--local-port/-l`,
   `--no-verify-tls`, `--poll-interval`. The reserved lifecycle-hook port
   (`AGENT_SANDBOX_HOOK_PORT`, default `9000`) is rejected — see
   [Guest agent & lifecycle hooks](#guest-agent--lifecycle-hooks).
-- `asb infra up`: `--file/-f` is repeatable and accepts directories
+- `vmnest infra up`: `--file/-f` is repeatable and accepts directories
   (multi-project), plus `--stack/-s`, `--rebuild`, `--parallelism/-p`.
 
-`asb create` resolves image/role from the flag → env var
-(`AGENT_SANDBOX_IMAGE_ARN` / `AGENT_SANDBOX_EXECUTION_ROLE_ARN`) → `asb infra`
-outputs, in that order, so after `asb infra up` most commands need no flags.
-`asb run` is the exception: it takes the image ARN as a required positional
+`vmnest create` resolves image/role from the flag → env var
+(`AGENT_SANDBOX_IMAGE_ARN` / `AGENT_SANDBOX_EXECUTION_ROLE_ARN`) → `vmnest infra`
+outputs, in that order, so after `vmnest infra up` most commands need no flags.
+`vmnest run` is the exception: it takes the image ARN as a required positional
 argument and is **not** auto-wired.
 
 The CLI keeps a local name → MicroVM map at `~/.agent_sandbox/state.json`
 (override with `AGENT_SANDBOX_STATE`), since AWS has no concept of sandbox names.
 
 > `image inspect` and `image prune` are available only as **MCP tools**, not as
-> `asb` CLI commands.
+> `vmnest` CLI commands.
 
 ### Networking
 
 Lambda MicroVMs use **network connectors** (not subnets/security groups) for
 ingress/egress, attached at `run_microvm` time. By default MicroVMs get managed
-egress (e.g. `INTERNET_EGRESS`) from the image, so `asb create`/`run` need no
+egress (e.g. `INTERNET_EGRESS`) from the image, so `vmnest create`/`run` need no
 network config.
 
 For custom VPC egress, provision a connector in `sandbox.yaml`'s `network.egress`
-block (`asb infra up` creates/records `egress_network_connector_arn`), then
-attach it per sandbox with `asb create app --egress` (pulls the connector from
+block (`vmnest infra up` creates/records `egress_network_connector_arn`), then
+attach it per sandbox with `vmnest create app --egress` (pulls the connector from
 infra outputs) or `--egress-connector <arn>`. The SDK accepts
 `ingress_network_connectors` / `egress_network_connectors` directly for finer
 control (e.g. `SHELL_INGRESS`).
 
 ### CLI semantics
 
-- `asb stop` **suspends** (resume with `asb start`); `asb rm` **terminates**.
-- `asb image build` zips a directory, uploads it to S3, and registers a MicroVM image (there is no local OCI cache on AWS).
-- `asb logs`/`asb metrics` read CloudWatch (best-effort; override the log group with `--log-group`).
+- `vmnest stop` **suspends** (resume with `vmnest start`); `vmnest rm` **terminates**.
+- `vmnest image build` zips a directory, uploads it to S3, and registers a MicroVM image (there is no local OCI cache on AWS).
+- `vmnest logs`/`vmnest metrics` read CloudWatch (best-effort; override the log group with `--log-group`).
 
 ## 5. Serve a web app from a sandbox
 
-`asb forward` runs a local reverse proxy so you can reach a service running
+`vmnest forward` runs a local reverse proxy so you can reach a service running
 *inside* a sandbox from your browser. The [examples/serve_fastapi.py](examples/serve_fastapi.py)
 script demonstrates the full flow: it writes a small FastAPI app into the VM,
 starts `uvicorn`, and proxies `http://localhost:8000` to it.
@@ -402,22 +408,22 @@ starts `uvicorn`, and proxies `http://localhost:8000` to it.
 python examples/serve_fastapi.py            # then open http://localhost:8000
 
 # or forward a port for a service you started yourself:
-asb forward app --remote-port 8000 --local-port 8000
+vmnest forward app --remote-port 8000 --local-port 8000
 ```
 
 ## Environment variables
 
-The SDK and CLI are configured mainly through `sandbox.yaml` + `asb infra`
+The SDK and CLI are configured mainly through `sandbox.yaml` + `vmnest infra`
 outputs, so **most setups need no environment variables at all**. The two below
 are the only values that must be resolvable; everything else is an optional
 override.
 
 **Required** — each needs *one of*: a CLI flag, an environment variable, or an
-`asb infra up` output (auto-wired). After `asb infra up` both are auto-wired.
+`vmnest infra up` output (auto-wired). After `vmnest infra up` both are auto-wired.
 
 | Variable | Purpose |
 | --- | --- |
-| `AGENT_SANDBOX_IMAGE_ARN` | MicroVM image ARN used by `asb create` / `asb run` and the SDK |
+| `AGENT_SANDBOX_IMAGE_ARN` | MicroVM image ARN used by `vmnest create` / `vmnest run` and the SDK |
 | `AGENT_SANDBOX_EXECUTION_ROLE_ARN` | Execution role ARN for the MicroVM |
 
 AWS credentials and region come from the standard boto3 chain
@@ -430,20 +436,20 @@ region must be one where Lambda MicroVMs is available (see Prerequisites).
 | --- | --- | --- |
 | `AGENT_SANDBOX_REGION` | boto3 default | Region for SDK / MCP calls |
 | `AGENT_SANDBOX_STATE` | `~/.agent_sandbox/state.json` | CLI name → MicroVM map |
-| `AGENT_SANDBOX_INFRA_STATE` | `~/.agent_sandbox/infra-state.json` | `asb infra` state file |
+| `AGENT_SANDBOX_INFRA_STATE` | `~/.agent_sandbox/infra-state.json` | `vmnest infra` state file |
 | `AGENT_SANDBOX_SETUP` | `sandbox.yaml` | Infra config path (search order: `$AGENT_SANDBOX_SETUP` → `sandbox.yaml` → legacy `setup.yaml`) |
 | `AGENT_SANDBOX_EGRESS_CONNECTOR` | from infra output | VPC egress network connector ARN to attach |
 | `AGENT_SANDBOX_WORKDIR` | `/work` | Default working directory inside the VM |
 | `AGENT_SANDBOX_VERIFY_TLS` | `1` | Set `0` to skip TLS verification to the MicroVM endpoint (debug only) |
 | `AGENT_SANDBOX_AGENT_PORT` | `8080` | agentd application port the SDK scopes auth tokens to (must match the guest's `AGENTD_PORT`) |
-| `AGENT_SANDBOX_HOOK_PORT` | `9000` | Reserved lifecycle-hook port; `asb forward` refuses it (must match the guest's `AGENTD_HOOK_PORT`) |
+| `AGENT_SANDBOX_HOOK_PORT` | `9000` | Reserved lifecycle-hook port; `vmnest forward` refuses it (must match the guest's `AGENTD_HOOK_PORT`) |
 
 The MCP server adds a further set of `AGENT_SANDBOX_MCP_*` tuning knobs —
 see [Configuration](#configuration) under the MCP section below.
 
 ## Use it from an AI agent (MCP)
 
-`agent-microvm` ships an [MCP](https://modelcontextprotocol.io/) server
+`vmnest` ships an [MCP](https://modelcontextprotocol.io/) server
 (`agent_sandbox_mcp`) that lets AI agents create isolated microVM sandboxes,
 execute code, manage files, read logs, and monitor resources. It mirrors the
 tool-naming conventions and response patterns of
@@ -453,13 +459,13 @@ implemented in Python with **FastMCP** on top of the `agent_sandbox` SDK.
 ### Installation
 
 The MCP server ships in the optional **`mcp` extra**. It **must** be installed —
-without it `asb mcp` exits immediately and the client reports
+without it `vmnest mcp` exits immediately and the client reports
 **"Failed to connect"**. Install it one of these ways:
 
 **From PyPI:**
 
 ```bash
-pip install "asbox[mcp]"
+pip install "vmnest[mcp]"
 ```
 
 **Source checkout (development):**
@@ -469,30 +475,30 @@ uv sync --extra mcp
 # or, with pip: pip install -e '.[mcp]'
 ```
 
-**Global tool (so `asb` is on your `PATH` everywhere)** — include the `[mcp]`
+**Global tool (so `vmnest` is on your `PATH` everywhere)** — include the `[mcp]`
 extra:
 
 ```bash
 # from a source checkout (editable — tracks your working tree):
 uv tool install --editable ".[mcp]" --force
-# or from PyPI (published as `asbox`):
-uv tool install "asbox[mcp]"
+# or from PyPI (published as `vmnest`):
+uv tool install "vmnest[mcp]"
 ```
 
 > **Gotcha:** keep the `[mcp]` extra every time you (re)install the global tool.
 > `uv tool install --reinstall .` **without** `[mcp]` drops the `mcp` package and
-> breaks `asb mcp` — re-run the command above with `".[mcp]"` to fix it.
+> breaks `vmnest mcp` — re-run the command above with `".[mcp]"` to fix it.
 
 Verify it's installed and reachable:
 
 ```bash
-asb mcp     # starts the stdio server (Ctrl+C to stop). An "mcp not available"
+vmnest mcp     # starts the stdio server (Ctrl+C to stop). An "mcp not available"
             # message instead means the [mcp] extra is missing — see above.
-which asb   # e.g. ~/.local/bin/asb — use this absolute path if your MCP client
-            # runs in a different environment and can't find asb on its PATH.
+which vmnest   # e.g. ~/.local/bin/vmnest — use this absolute path if your MCP client
+            # runs in a different environment and can't find vmnest on its PATH.
 ```
 
-Provision the backend first (`asb infra up`) so image/role ARNs resolve, or set
+Provision the backend first (`vmnest infra up`) so image/role ARNs resolve, or set
 `AGENT_SANDBOX_IMAGE_ARN` / `AGENT_SANDBOX_EXECUTION_ROLE_ARN` (see
 [Environment variables](#environment-variables)) — otherwise the client connects
 but tool calls error at runtime.
@@ -500,20 +506,20 @@ but tool calls error at runtime.
 The server runs over stdio and can be launched three ways — use whichever your
 client makes easiest:
 
-- `asb mcp` — via the bundled CLI (recommended).
-- `agent-sandbox-mcp` — the standalone console script (same server).
-- `python -m agent_sandbox_mcp` — module form, handy when `asb` isn't on `PATH`.
+- `vmnest mcp` — via the bundled CLI (recommended).
+- `vmnest-mcp` — the standalone console script (same server).
+- `python -m agent_sandbox_mcp` — module form, handy when `vmnest` isn't on `PATH`.
 
-All the client snippets below use `asb mcp`. If your MCP client runs in a
-different environment than your shell (so `asb` isn't on its `PATH`), swap in the
-absolute path to `asb`, or use `uv run --directory /path/to/agent-microvm asb
+All the client snippets below use `vmnest mcp`. If your MCP client runs in a
+different environment than your shell (so `vmnest` isn't on its `PATH`), swap in the
+absolute path to `vmnest`, or use `uv run --directory /path/to/vmnest vmnest
 mcp`. Wire the required ARNs through the client's `env` block when they aren't
 already exported, as shown in the generic example.
 
 **Claude Code**
 
 ```bash
-claude mcp add agent-sandbox -- asb mcp
+claude mcp add agent-sandbox -- vmnest mcp
 ```
 
 **Claude Desktop** — add to `claude_desktop_config.json` (macOS:
@@ -523,7 +529,7 @@ claude mcp add agent-sandbox -- asb mcp
 {
   "mcpServers": {
     "agent-sandbox": {
-      "command": "asb",
+      "command": "vmnest",
       "args": ["mcp"]
     }
   }
@@ -536,7 +542,7 @@ claude mcp add agent-sandbox -- asb mcp
 {
   "mcpServers": {
     "agent-sandbox": {
-      "command": "asb",
+      "command": "vmnest",
       "args": ["mcp"]
     }
   }
@@ -549,7 +555,7 @@ claude mcp add agent-sandbox -- asb mcp
 {
   "servers": {
     "agent-sandbox": {
-      "command": "asb",
+      "command": "vmnest",
       "args": ["mcp"]
     }
   }
@@ -560,7 +566,7 @@ claude mcp add agent-sandbox -- asb mcp
 shape as Cursor/Claude Desktop above).
 
 **Goose** — Goose uses a YAML config. Either run `goose configure` → *Add
-Extension* → *Command-line Extension* and enter `asb mcp`, or add an entry to
+Extension* → *Command-line Extension* and enter `vmnest mcp`, or add an entry to
 `~/.config/goose/config.yaml`:
 
 ```yaml
@@ -568,7 +574,7 @@ extensions:
   agent-sandbox:
     enabled: true
     type: stdio
-    cmd: asb
+    cmd: vmnest
     args: [mcp]
 ```
 
@@ -580,7 +586,7 @@ exported in the client's environment:
 {
   "mcpServers": {
     "agent-sandbox": {
-      "command": "asb",
+      "command": "vmnest",
       "args": ["mcp"],
       "env": {
         "AGENT_SANDBOX_IMAGE_ARN": "arn:aws:lambda:us-east-1:...:microvm-image/...",
@@ -603,8 +609,8 @@ metadata (`truncated`, `total_bytes`, `returned_bytes`) when shortened.
 | Tool | Description |
 | --- | --- |
 | `runtime_check` | Check boto3, the `lambda-microvms` client, AWS credentials, and resolved image/role ARNs |
-| `runtime_install` | Explain how to provision the backend (`asb infra up`); reports current status |
-| `infra_outputs` | Pull image/role/region/egress from `asb infra` outputs (labeled with `project`/`stack`) so you needn't paste them; target a stack with `project=` / `setup_file=` |
+| `runtime_install` | Explain how to provision the backend (`vmnest infra up`); reports current status |
+| `infra_outputs` | Pull image/role/region/egress from `vmnest infra` outputs (labeled with `project`/`stack`) so you needn't paste them; target a stack with `project=` / `setup_file=` |
 | `infra_list` | List every provisioned `project/stack` in local state (for multi-`sandbox.yaml` setups) |
 
 **Sandbox Lifecycle**
@@ -673,7 +679,7 @@ metadata (`truncated`, `total_bytes`, `returned_bytes`) when shortened.
 | URI | Description |
 | --- | --- |
 | `agent-sandbox://runtime` | Runtime/config status |
-| `agent-sandbox://infra` | Resolved `asb infra` outputs (image/role/region/egress, labeled with project) |
+| `agent-sandbox://infra` | Resolved `vmnest infra` outputs (image/role/region/egress, labeled with project) |
 | `agent-sandbox://sandboxes` | Current sandbox inventory |
 | `agent-sandbox://images` | Current account image inventory |
 | `agent-sandbox://policy` | Effective host-path and dangerous-operation policy |
@@ -695,10 +701,10 @@ for the env values the MCP process must resolve independently:
 | `AGENT_SANDBOX_MCP_ENABLE_DANGEROUS` | `0` | Reserved for future dangerous ops; destructive image ops still require `confirm: true` |
 | `AGENT_SANDBOX_MCP_MAX_OUTPUT_BYTES` | `1048576` | Default cap for command output, logs, and file reads |
 | `AGENT_SANDBOX_MCP_DEFAULT_TIMEOUT_MS` | `120000` | Default timeout for exec-style operations |
-| `AGENT_SANDBOX_IMAGE_ARN` | from `asb infra` | MicroVM image ARN |
-| `AGENT_SANDBOX_EXECUTION_ROLE_ARN` | from `asb infra` | Execution role ARN |
+| `AGENT_SANDBOX_IMAGE_ARN` | from `vmnest infra` | MicroVM image ARN |
+| `AGENT_SANDBOX_EXECUTION_ROLE_ARN` | from `vmnest infra` | Execution role ARN |
 | `AGENT_SANDBOX_REGION` | AWS default | AWS region |
-| `AGENT_SANDBOX_EGRESS_CONNECTOR` | from `asb infra` | VPC egress network connector ARN to attach |
+| `AGENT_SANDBOX_EGRESS_CONNECTOR` | from `vmnest infra` | VPC egress network connector ARN to attach |
 | `AGENT_SANDBOX_WORKDIR` | `/work` | Default working directory inside the VM |
 | `AGENT_SANDBOX_VERIFY_TLS` | `1` | Set `0` to skip TLS verification to the MicroVM endpoint (debug only) |
 
@@ -742,14 +748,14 @@ The hooks make sandboxes faster and safer with no action on your part:
 | `/ready` | during image build, before the snapshot | waits until agentd is fully serving, so the snapshot captures a ready agent — no first-`exec` race, faster starts |
 | `/validate` | after build, on a test VM | smoke-tests the snapshot so a broken image fails the build instead of shipping |
 | `/run` | once per VM, on start from snapshot | mints a fresh per-VM identity and reseeds randomness (fixes the shared-snapshot uniqueness pitfall) |
-| `/resume` | after `asb start` (resume) | reseeds randomness / refreshes per-VM state |
-| `/suspend` | before `asb stop` suspends | drains any in-flight `exec` so commands aren't frozen mid-run |
-| `/terminate` | before `asb rm` tears down | flushes logs; best-effort cleanup |
+| `/resume` | after `vmnest start` (resume) | reseeds randomness / refreshes per-VM state |
+| `/suspend` | before `vmnest stop` suspends | drains any in-flight `exec` so commands aren't frozen mid-run |
+| `/terminate` | before `vmnest rm` tears down | flushes logs; best-effort cleanup |
 
 Hooks are baked into the image at build time, so **rebuild to pick them up on an
-existing stack**: `asb infra up --rebuild`.
+existing stack**: `vmnest infra up --rebuild`.
 
-**The hook port is reserved.** `asb forward` refuses `--remote-port 9000` — the
+**The hook port is reserved.** `vmnest forward` refuses `--remote-port 9000` — the
 lifecycle plane is the platform's private channel and must never be
 client-reachable, and auth tokens are scoped to the app port only.
 
@@ -761,9 +767,9 @@ guest must bind the same one.
 
 ## Bring your own guest image
 
-You don't have to use the bundled guest. `asb image build ./my-guest` (or
+You don't have to use the bundled guest. `vmnest image build ./my-guest` (or
 `image.guest_dir` in `sandbox.yaml`) accepts any directory with a `Dockerfile`.
-But the SDK, `asb` CLI, **and the MCP server** all reach into the VM through the
+But the SDK, `vmnest` CLI, **and the MCP server** all reach into the VM through the
 same small HTTP agent (`agentd`), so a custom image must honor that contract or
 `exec`/`fs` — and therefore **every MCP `sandbox_*` tool** — will fail to
 connect. To keep a custom image working:
@@ -779,7 +785,7 @@ connect. To keep a custom image working:
 3. **Lifecycle hooks are opt-in.** To keep them, run `agentd.serve` (it starts
    the hook server too), `EXPOSE` + bind `AGENTD_HOOK_PORT` (default `9000`), keep
    `AGENT_SANDBOX_HOOK_PORT` in sync, and build with `--hooks`
-   (`asb infra up` does this). Drop them and the sandbox still works — you just
+   (`vmnest infra up` does this). Drop them and the sandbox still works — you just
    lose the faster-start / per-VM-uniqueness benefits (see above).
 
 ### If you use MCP with a custom image
@@ -795,7 +801,7 @@ block (see the config examples under
 | `AGENT_SANDBOX_IMAGE_ARN` | your custom image's ARN | MCP creates sandboxes from it |
 | `AGENT_SANDBOX_EXECUTION_ROLE_ARN` | your execution role | assumed by the MicroVM |
 | `AGENT_SANDBOX_AGENT_PORT` | the port your agent binds (`AGENTD_PORT`) | MCP scopes exec/fs auth tokens to it |
-| `AGENT_SANDBOX_HOOK_PORT` | your guest's `AGENTD_HOOK_PORT` | keeps `asb forward` guarding the right port |
+| `AGENT_SANDBOX_HOOK_PORT` | your guest's `AGENTD_HOOK_PORT` | keeps `vmnest forward` guarding the right port |
 
 A mismatch between the port the MCP process scopes tokens to and the port your
 custom agent actually binds is the usual cause of MCP `sandbox_exec` /

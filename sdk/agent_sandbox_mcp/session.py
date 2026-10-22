@@ -2,7 +2,7 @@
 
 Maps human-friendly sandbox names to live :class:`~agent_sandbox.Sandbox` objects
 and persists their identity via the SDK's CLI state store, so sandboxes created
-through the MCP server are also visible to the ``asb`` CLI (and vice versa). Also
+through the MCP server are also visible to the ``vmnest`` CLI (and vice versa). Also
 owns per-region :class:`~agent_sandbox.control_plane.ControlPlane` clients and
 resolves image / role / egress-connector defaults from :class:`Config`.
 """
@@ -23,7 +23,7 @@ def resolve_egress_connectors(
     """Resolve the egress network connector(s) to attach at run time.
 
     Precedence: an explicit ``egress_connector`` ARN wins; otherwise ``use_infra``
-    pulls the connector configured via env / ``asb infra`` outputs. Returns
+    pulls the connector configured via env / ``vmnest infra`` outputs. Returns
     ``None`` when no connector should be attached (the default).
     """
     if egress_connector:
@@ -33,7 +33,7 @@ def resolve_egress_connectors(
         if not arn:
             raise SandboxError(
                 "egress=true but no egress connector is configured. Set "
-                "network.egress in setup.yaml and run `asb infra up`, set "
+                "network.egress in setup.yaml and run `vmnest infra up`, set "
                 "$AGENT_SANDBOX_EGRESS_CONNECTOR, or pass egress_connector."
             )
         return [arn]
@@ -99,7 +99,7 @@ class SandboxRegistry:
         if not resolved:
             raise SandboxError(
                 "No MicroVM image ARN. Pass image=..., set "
-                "$AGENT_SANDBOX_IMAGE_ARN, or run `asb infra up`."
+                "$AGENT_SANDBOX_IMAGE_ARN, or run `vmnest infra up`."
             )
         return resolved
 
@@ -108,7 +108,7 @@ class SandboxRegistry:
         if not resolved:
             raise SandboxError(
                 "No execution role ARN. Pass role=..., set "
-                "$AGENT_SANDBOX_EXECUTION_ROLE_ARN, or run `asb infra up`."
+                "$AGENT_SANDBOX_EXECUTION_ROLE_ARN, or run `vmnest infra up`."
             )
         return resolved
 

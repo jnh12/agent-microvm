@@ -48,7 +48,7 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         output, then terminates the VM. Nothing is tracked in local state.
 
         Set `egress_connector` to attach a specific VPC egress connector ARN, or
-        `egress=true` to use the one from setup.yaml / `asb infra` outputs.
+        `egress=true` to use the one from setup.yaml / `vmnest infra` outputs.
         """
         name = f"mcp-run-{secrets.token_hex(4)}"
         egress_connectors = resolve_egress_connectors(config, egress_connector, egress)
@@ -86,11 +86,11 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
     ) -> dict:
         """Create and boot a persistent, named sandbox tracked in local state.
 
-        The sandbox is reachable by `name` from other tools and from the `asb`
+        The sandbox is reachable by `name` from other tools and from the `vmnest`
         CLI until `sandbox_remove` terminates it.
 
         Set `egress_connector` to attach a specific VPC egress connector ARN, or
-        `egress=true` to use the one from setup.yaml / `asb infra` outputs.
+        `egress=true` to use the one from setup.yaml / `vmnest infra` outputs.
         """
         egress_connectors = resolve_egress_connectors(config, egress_connector, egress)
         sandbox = await registry.create_named(

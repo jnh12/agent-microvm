@@ -3,8 +3,8 @@
 Requires the infra to be deployed (see README). Provide the image ARN and
 execution role ARN via env vars:
 
-    export AGENT_SANDBOX_IMAGE_ARN=$(asb infra output image_arn)
-    export AGENT_SANDBOX_EXECUTION_ROLE_ARN=$(asb infra output execution_role_arn)
+    export AGENT_SANDBOX_IMAGE_ARN=$(vmnest infra output image_arn)
+    export AGENT_SANDBOX_EXECUTION_ROLE_ARN=$(vmnest infra output execution_role_arn)
     python examples/run_code.py
 """
 

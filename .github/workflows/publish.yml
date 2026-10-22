@@ -1,8 +1,8 @@
 name: Publish
 
-# Branch → index:
-#   develop → TestPyPI   (test releases)
-#   main    → PyPI       (production releases)
+# Pushes validate and build. Publish deliberately with workflow_dispatch:
+#   develop + testpypi → test release
+#   main + pypi → production release
 #
 # Uses PyPI Trusted Publishing (OIDC) — no API tokens/secrets. Each index has a
 # GitHub Environment (testpypi / pypi) that must be registered as a trusted
@@ -15,7 +15,19 @@ name: Publish
 on:
   push:
     branches: [main, develop]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      index:
+        description: Package index to publish to
+        required: true
+        type: choice
+        default: testpypi
+        options:
+          - testpypi
+          - pypi
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -45,7 +57,7 @@ jobs:
 
   publish-testpypi:
     needs: build
-    if: github.ref == 'refs/heads/develop'
+    if: github.event_name == 'workflow_dispatch' && inputs.index == 'testpypi' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     environment: testpypi
     permissions:
@@ -62,7 +74,7 @@ jobs:
 
   publish-pypi:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.index == 'pypi' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

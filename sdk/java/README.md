@@ -4,9 +4,10 @@ Java 21+ SDK for AWS Lambda MicroVMs: lifecycle, execution, files, monitoring, i
 
 ## Install and download
 
-From `sdk/java/` in the repository:
+From a repository checkout:
 
 ```sh
+cd sdk/java
 ./gradlew test build publishToMavenLocal
 ```
 
@@ -33,6 +34,8 @@ Keep `mavenCentral()` for dependencies. Maven consumers can use the extracted di
 `./gradlew sdkDistribution` builds the ZIP in `build/distributions`. CI downloads expire after 30 days. The SDK is not published to Maven Central. Public publishing requires a verified Central namespace, signing keys, and publishing credentials; after publication consumers can use `mavenCentral()` and the release version directly.
 
 ## Usage
+
+Configure AWS credentials and `AWS_REGION` for the AWS client. Set `AGENT_SANDBOX_IMAGE_ARN` and `AGENT_SANDBOX_EXECUTION_ROLE_ARN` to your image and execution role. The example below runs inside a Java method that declares `throws Exception`.
 
 ```java
 import io.github.jnh12.vmnest.*;
@@ -133,8 +136,11 @@ The infrastructure journal records ownership incrementally. `destroy(true)` dele
 
 ## Validation
 
+Run from `sdk/java/`:
+
 ```sh
-./gradlew test build publish  # publish only to build/repository, not a remote registry
+./gradlew test build sdkDistribution  # publishes only to build/repository
+./gradlew -p tests/consumer compileJava  # checks public API dependencies
 ```
 
 Tests cover lifecycle, signing/serialization, token refresh limits, filesystem transport, host policy, log pagination, metrics, registry locking/persistence, archive contents, provisioning ownership/partial failure, and forwarding. The live test is skipped unless explicitly enabled:

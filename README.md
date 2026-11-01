@@ -6,14 +6,14 @@
 
 **Isolated AWS microVM sandboxes for AI agents.**
 
-Python SDK · CLI · MCP server · AWS microVMs
+Python and Java SDKs · CLI · MCP server · AWS microVMs
 
 [![GitHub stars](https://img.shields.io/github/stars/jnh12/agent-microvm?style=flat&color=f6c85f)](https://github.com/jnh12/agent-microvm/stargazers)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-71d6c5)](LICENSE)
 [![PyPI version](https://img.shields.io/pypi/v/vmnest?color=8bb8f8)](https://pypi.org/project/vmnest/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-8bb8f8)](https://www.python.org/downloads/)
 
-[Getting started](#1-install-the-sdkcli) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
+[Python setup](#1-install-the-sdkcli) · [Java setup](sdk/java/README.md#install-and-download) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -150,12 +150,12 @@ The `vmnest` CLI and MCP server are distributed with the Python package.
 
 | Component | Description |
 | --- | --- |
-| Runtime | AWS Lambda MicroVMs (managed Firecracker) via `boto3` `lambda-microvms` |
+| Runtime | AWS Lambda MicroVMs (managed Firecracker) via the AWS SDK for Python or Java |
 | Guest agent | `guest/agentd` — FastAPI **agentd** (exec/fs API on port 8080) plus a **lifecycle-hook** server (port 9000), run together via `agentd.serve` and baked into the MicroVM image |
-| SDK | `agent_sandbox.Sandbox.create(...)` |
-| Transport | `agent_sandbox.agent_client.AgentClient` (HTTPS + `X-aws-proxy-auth`) |
+| SDKs | Python: `agent_sandbox.Sandbox`; Java: `io.github.jnh12.vmnest.Sandbox` |
+| Transport | Both SDKs use HTTPS + `X-aws-proxy-auth` through their `AgentClient` |
 | CLI | `vmnest` |
-| Infrastructure | `vmnest infra` (bare `boto3` provisioner, `agent_sandbox.infra`) driven by `sandbox.yaml`; PyYAML ships in the base install |
+| Infrastructure | Python: `vmnest infra` / `agent_sandbox.infra`, configured through `sandbox.yaml`; Java: `Infrastructure` with typed configuration |
 | MCP server | `agent_sandbox_mcp` (FastMCP server, optional `[mcp]` extra, launched with `vmnest mcp`) |
 
 ## Architecture
@@ -163,7 +163,7 @@ The `vmnest` CLI and MCP server are distributed with the Python package.
 ```mermaid
 graph TD
     subgraph app [Your Application]
-        SDK["agent_sandbox SDK / vmnest CLI"]
+        SDK["Python SDK / Java SDK / vmnest CLI"]
     end
     subgraph aws [lambda-microvms control plane]
         CP["run / suspend / resume / terminate + auth token"]
@@ -172,7 +172,7 @@ graph TD
         AG["agentd: exec, fs.read, fs.write (:8080)"]
         HK["lifecycle hooks: ready / validate / run / resume / suspend / terminate (:9000)"]
     end
-    SDK -->|"boto3"| CP
+    SDK -->|"AWS SDK"| CP
     CP -->|"id + HTTPS URL"| SDK
     SDK -->|"HTTPS + X-aws-proxy-auth"| AG
     CP -->|"lifecycle hooks (platform-only)"| HK
@@ -180,8 +180,9 @@ graph TD
 
 ## Prerequisites
 
-- Python 3.11+, [`uv`](https://docs.astral.sh/uv/)
-- AWS CLI v2 recent enough to include `lambda-microvms`, with credentials configured
+- Python SDK / CLI / MCP: Python 3.11+ with `pip` or [`uv`](https://docs.astral.sh/uv/)
+- Java SDK: JDK 21+; the Gradle wrapper is included in `sdk/java/`
+- AWS credentials configured for your SDK; AWS CLI v2 is useful for CLI-based credential setup and diagnostics
 - Docker (only to test the guest image locally; the build itself happens in AWS)
 - A region where Lambda MicroVMs is available: `us-east-1`, `us-east-2`, `us-west-2`, `eu-west-1`, `ap-northeast-1`. Pick any of these via `region:` in `sandbox.yaml` or the standard `AWS_DEFAULT_REGION` / `AWS_REGION` environment variable.
 
@@ -189,6 +190,8 @@ No IaC engine or external CLI is required — `vmnest infra` provisions everythi
 with `boto3` (a core dependency) and tracks state in a local JSON file.
 
 ## 1. Install the SDK/CLI
+
+For Java, follow the [Java installation and download guide](sdk/java/README.md#install-and-download). The walkthrough below uses the Python package and `vmnest` CLI.
 
 The package is published on PyPI as **`vmnest`** (Python import: `agent_sandbox`; command: `vmnest`). Install with `pip`:
 
@@ -284,6 +287,8 @@ are left untouched. This file also holds the outputs (`image_arn`,
 `execution_role_arn`, `build_bucket`) that the SDK/CLI auto-wire from.
 
 ## 3. Use the SDK
+
+For Java code examples, see [Java SDK usage](sdk/java/README.md#usage). The examples here use Python.
 
 After `vmnest infra up`, the CLI auto-reads `image_arn`, `execution_role_arn`, and
 any network outputs from the stack. For the raw SDK you can either rely on that
@@ -414,6 +419,8 @@ vmnest forward app --remote-port 8000 --local-port 8000
 ```
 
 ## Environment variables
+
+This section describes Python SDK, CLI, and MCP configuration. Java uses AWS client configuration and `RuntimeConfig`; see [Java SDK usage](sdk/java/README.md#usage).
 
 The SDK and CLI are configured mainly through `sandbox.yaml` + `vmnest infra`
 outputs, so **most setups need no environment variables at all**. The two below

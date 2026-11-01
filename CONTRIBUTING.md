@@ -5,7 +5,8 @@ development environment, run the tests and linter, and open a pull request.
 
 ## Prerequisites
 
-- Python 3.11+
+- Java SDK: JDK 21+ (Gradle wrapper included)
+- Python SDK: Python 3.11+
 - [`uv`](https://docs.astral.sh/uv/) (recommended) or `pip`
 - AWS credentials are only needed for the live end-to-end tests; the unit tests
   run without any cloud access.
@@ -26,7 +27,11 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,mcp]"
 ```
 
-## Run the tests
+Java sources share `sdk/` with the Python packages; Java tests are in `tests/java/`.
+Run `./gradlew test build sdkDistribution` from the repository root (`gradlew.bat` on Windows).
+See [Java SDK usage](docs/java.md) for installation.
+
+## Run the Python tests
 
 ```bash
 uv run pytest                       # SDK / infra unit tests

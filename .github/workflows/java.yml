@@ -1,10 +1,11 @@
 name: Java SDK
 on:
+  workflow_dispatch:
   pull_request:
-    paths: ['java/**', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/io/**', 'tests/java/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
   push:
     branches: [main, develop]
-    paths: ['java/**', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/io/**', 'tests/java/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
 permissions:
   contents: read
 jobs:
@@ -17,5 +18,12 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
-      - run: bash gradlew test build publish
-        working-directory: java
+      - run: bash gradlew test build sdkDistribution
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vmnest-java
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            build/libs/*.jar
+            build/distributions/*.zip

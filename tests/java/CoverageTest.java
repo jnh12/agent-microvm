@@ -40,7 +40,7 @@ class CoverageTest {
       add(mapping, Images.class, method, "image_" + method);
     var upstream = new TreeSet<String>();
     var regex = Pattern.compile("async def ((?:sandbox_|image_|infra_|runtime_)[a-z_]+)\\(");
-    try (var files = Files.list(Path.of("../sdk/agent_sandbox_mcp/tools"))) {
+    try (var files = Files.list(Path.of("sdk/agent_sandbox_mcp/tools"))) {
       for (var file : files.filter(p -> p.toString().endsWith(".py")).toList()) {
         var matches = regex.matcher(Files.readString(file));
         while (matches.find()) upstream.add(matches.group(1));

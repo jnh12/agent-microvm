@@ -19,7 +19,7 @@ Python SDK · CLI · MCP server · AWS microVMs
 
 Easy, fast, isolated **microVM sandboxes** for untrusted workloads (AI agents,
 user code, CI jobs) using [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
-and provisioned with **bare `boto3`** (no external IaC engine required).
+and provisioned through the AWS SDKs.
 
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
@@ -60,10 +60,10 @@ a disposable tool:
   with memory and disk intact.
 - **Serverless economics** — pay for what you use; no idle VM fleet sitting
   between agent runs.
-- **Batteries included** — one `agent_sandbox` SDK + `vmnest` CLI, a per-sandbox
+- **Batteries included** — Python and Java SDKs, the `vmnest` CLI, a per-sandbox
   HTTPS endpoint, and a built-in **MCP server** so Claude, Cursor, Goose, and
   other agents can create, run, and manage sandboxes as native tools.
-- **No IaC engine** — infrastructure is provisioned with bare `boto3` and tracked
+- **No IaC engine** — infrastructure is provisioned through AWS SDKs and tracked
   in a local state file; nothing else to install or operate.
 
 ### Use cases
@@ -139,9 +139,14 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 
 ## Components
 
-**Java 21+:** [Native Java SDK](java/README.md) — Gradle library for the same
-MicroVM lifecycle and guest exec/file protocol, using the official AWS Java SDK.
-No external Python wrapper is required.
+Choose the SDK for your application. Both use AWS Lambda MicroVMs and the shared guest API.
+
+| SDK | Install and usage | Source |
+|---|---|---|
+| Python 3.11+ | [`pip install vmnest`](#1-install-the-sdkcli) | [`sdk/agent_sandbox`](sdk/agent_sandbox) |
+| Java 21+ | [Gradle, Maven, and downloads](docs/java.md) | [`sdk/io/github/jnh12/vmnest`](sdk/io/github/jnh12/vmnest) |
+
+The `vmnest` CLI and MCP server are distributed with the Python package.
 
 | Component | Description |
 | --- | --- |

@@ -5,7 +5,7 @@ sandboxes on AWS Lambda MicroVMs) as Model Context Protocol tools and resources.
 
 Mirrors the tool-naming conventions and response patterns of microsandbox-mcp,
 implemented in Python with FastMCP. See ``README.md`` for the tool catalog and
-the "SDK Gaps" section for reference tools that this backend cannot support.
+the "Unsupported capabilities" section for reference tools not implemented here.
 """
 
 __version__ = "0.1.2"

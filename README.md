@@ -6,7 +6,7 @@
 
 **Isolated AWS microVM sandboxes for AI agents.**
 
-Python and Java SDKs · CLI · MCP server · AWS microVMs
+SDK · CLI · MCP server · AWS microVMs
 
 [![GitHub stars](https://img.shields.io/github/stars/jnh12/agent-microvm?style=flat&color=f6c85f)](https://github.com/jnh12/agent-microvm/stargazers)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-71d6c5)](LICENSE)
@@ -717,20 +717,32 @@ for the env values the MCP process must resolve independently:
 | `AGENT_SANDBOX_WORKDIR` | `/work` | Default working directory inside the VM |
 | `AGENT_SANDBOX_VERIFY_TLS` | `1` | Set `0` to skip TLS verification to the MicroVM endpoint (debug only) |
 
-### SDK Gaps
+<a id="sdk-gaps"></a>
 
-The server stays a thin adapter over the `agent_sandbox` SDK and only exposes
-what the AWS Lambda MicroVMs backend supports today. The following
-microsandbox-mcp capabilities are intentionally **not** implemented because the
-backend has no first-class API for them:
+### Unsupported capabilities
 
-- **Volumes** (`volume_*`) — no named-volume API.
-- **Snapshots** (`snapshot_*`) — only suspend/resume exist, not content snapshots.
-- **SSH / SFTP** (`sandbox_ssh_*`, `sandbox_sftp_*`) — no SSH subsystem in the guest.
+The MCP server is a thin adapter over the `agent_sandbox` SDK. These
+microsandbox-mcp operations are not implemented by this repository's MCP server,
+Python SDK, or Java SDK. The limitations come from a combination of the available
+AWS APIs and the current guest implementation:
+
+- **Volumes** (`volume_*`) — no named-volume management API in the SDKs or
+  [AWS Lambda MicroVMs API](https://docs.aws.amazon.com/lambda/latest/microvm-api/API_Operations.html).
+- **User-managed snapshots** (`snapshot_*`) — no API here to capture a running
+  sandbox as a named snapshot and restore or clone it later. AWS does use
+  [image-build snapshots](https://docs.aws.amazon.com/lambda/latest/dg/microvms-images-snapshots.html)
+  and preserves memory and disk during suspend/resume; those are distinct features.
+- **SSH / SFTP tools** (`sandbox_ssh_*`, `sandbox_sftp_*`) — no SSH/SFTP client
+  integration in the SDKs or MCP server, and the bundled guest does not configure
+  an SSH server. AWS separately supports
+  [interactive shell authentication](https://docs.aws.amazon.com/lambda/latest/microvm-api/API_CreateMicrovmShellAuthToken.html)
+  with `SHELL_INGRESS`; this is not an implementation of these MCP tools.
 - **Streaming exec sessions** (`sandbox_exec_start` / `_poll` / `_write_stdin` /
-  `_signal` / `_close`) and `sandbox_drain` — `agentd`'s `/v1/exec` is a blocking,
-  one-shot call, so interactive/streamed sessions are not possible without
-  guest-side changes.
+  `_signal` / `_close`) and `sandbox_drain` — `agentd`'s `/v1/exec` returns output
+  after a command completes or times out. It has no session handles, interactive
+  stdin, or incremental output API. Supporting these operations through `agentd`
+  requires guest and client changes. This does not preclude AWS's separate
+  interactive shell facility.
 
 ### MCP development
 
@@ -837,7 +849,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 Volumes, PTY/interactive sessions, network policy / TLS-MITM, and streaming exec
 (HTTP/2 / WebSocket) are not yet implemented. See `sdk/agent_sandbox/` for
-extension points, and [SDK Gaps](#sdk-gaps) for how these surface (or don't) in
+extension points, and [Unsupported capabilities](#unsupported-capabilities) for how these surface (or don't) in
 the MCP server.
 
 ## Contributing

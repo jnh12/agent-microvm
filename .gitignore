@@ -26,6 +26,3 @@ uv.lock
 
 .cursor
 .claude
-# Java / Gradle
-.gradle/
-.idea/

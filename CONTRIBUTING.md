@@ -27,9 +27,9 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,mcp]"
 ```
 
-Java sources share `sdk/` with the Python packages; Java tests are in `tests/java/`.
-Run `./gradlew test build sdkDistribution` from the repository root (`gradlew.bat` on Windows).
-See [Java SDK usage](docs/java.md) for installation.
+The Java SDK, Gradle build, documentation, and tests live in `sdk/java/`.
+Run `./gradlew test build sdkDistribution` from `sdk/java/` (`gradlew.bat` on Windows).
+See [Java SDK usage](sdk/java/README.md) for installation.
 
 ## Run the Python tests
 

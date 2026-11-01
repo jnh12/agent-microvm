@@ -4,7 +4,7 @@ Java 21+ SDK for AWS Lambda MicroVMs: lifecycle, execution, files, monitoring, i
 
 ## Install and download
 
-From the repository root:
+From `sdk/java/` in the repository:
 
 ```sh
 ./gradlew test build publishToMavenLocal

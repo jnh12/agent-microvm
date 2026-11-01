@@ -2,15 +2,18 @@ name: Java SDK
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['sdk/io/**', 'tests/java/**', 'tests/consumer/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
   push:
     branches: [main, develop]
-    paths: ['sdk/io/**', 'tests/java/**', 'tests/consumer/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
 permissions:
   contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/java
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -26,5 +29,5 @@ jobs:
           retention-days: 30
           if-no-files-found: error
           path: |
-            build/libs/*.jar
-            build/distributions/*.zip
+            sdk/java/build/libs/*.jar
+            sdk/java/build/distributions/*.zip

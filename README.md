@@ -144,7 +144,7 @@ Choose the SDK for your application. Both use AWS Lambda MicroVMs and the shared
 | SDK | Install and usage | Source |
 |---|---|---|
 | Python 3.11+ | [`pip install vmnest`](#1-install-the-sdkcli) | [`sdk/agent_sandbox`](sdk/agent_sandbox) |
-| Java 21+ | [Gradle, Maven, and downloads](docs/java.md) | [`sdk/io/github/jnh12/vmnest`](sdk/io/github/jnh12/vmnest) |
+| Java 21+ | [Gradle, Maven, and downloads](sdk/java/README.md) | [`sdk/java`](sdk/java) |
 
 The `vmnest` CLI and MCP server are distributed with the Python package.
 

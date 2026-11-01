@@ -23,22 +23,18 @@ publishing {
  repositories { maven { name = 'verification'; url = layout.buildDirectory.dir('repository') } }
 }
 tasks.register('bundleGuest', Zip) {
- from('guest') { exclude '**/__pycache__/**', '**/*.pyc' }
+ from('../../guest') { exclude '**/__pycache__/**', '**/*.pyc' }
  archiveFileName = 'vmnest-guest.zip'
  destinationDirectory = layout.buildDirectory.dir('generated-guest')
 }
-tasks.named('processResources') { dependsOn 'bundleGuest'; from(tasks.named('bundleGuest')); from('LICENSE') { into 'META-INF' } }
+tasks.named('processResources') { dependsOn 'bundleGuest'; from(tasks.named('bundleGuest')); from('../../LICENSE') { into 'META-INF' } }
 
-sourceSets {
-    main.java { srcDirs = ['sdk']; include 'io/**/*.java' }
-    test.java.srcDirs = ['tests/java']
-}
 tasks.register('sdkDistribution', Zip) {
     dependsOn 'publishMavenJavaPublicationToVerificationRepository'
     archiveBaseName = 'vmnest-java'
     archiveClassifier = 'maven-repository'
     destinationDirectory = layout.buildDirectory.dir('distributions')
     from(layout.buildDirectory.dir('repository')) { into 'repository' }
-    from('docs/java.md') { rename { 'README.md' } }
-    from('LICENSE')
+    from('README.md')
+    from('../../LICENSE')
 }

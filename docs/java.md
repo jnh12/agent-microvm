@@ -119,7 +119,7 @@ try (var cw = CloudWatchClient.create(); var logs = CloudWatchLogsClient.create(
 }
 ```
 
-Use your configured image log group; it may differ from `/aws/lambda-microvms/<vm-id>`. Missing metric data is `OptionalDouble.empty()`, not zero. Log reads paginate and retain the requested tail after filtering. Use the cursor returned from `pollLogs` for subsequent calls. Filesystem helpers run argument-separated Python snippets **inside the existing guest**, not on the Java host. Recreate guest-bound `SandboxFiles` handles after resume because endpoints/tokens can change.
+Use your configured image log group; it may differ from `/aws/lambda-microvms/<vm-id>`. Missing metric data is `OptionalDouble.empty()`, not zero. Log reads paginate and retain the requested tail after filtering. `pollLogs(group, null, duration)` starts a polling session. Pass `batch.cursor()` on subsequent calls and read `batch.events()`. The cursor preserves pagination, timestamps, and delivered event IDs, including across empty responses and long polling pauses. It retains a one-minute overlap behind the latest event for delayed ingestion; events arriving more than a minute behind that watermark require a historical `readLogs` query. Keep cursors scoped to their log group. Raw AWS pagination tokens are not polling checkpoints. Filesystem helpers run argument-separated Python snippets **inside the existing guest**, not on the Java host. Recreate guest-bound `SandboxFiles` handles after resume because endpoints/tokens can change.
 
 ## Persistent computers and provisioning
 

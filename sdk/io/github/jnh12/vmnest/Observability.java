@@ -80,21 +80,62 @@ public final class Observability {
     return List.copyOf(result);
   }
 
-  public FilterLogEventsResponse pollLogs(String group, String cursor, Duration follow)
+  /** Checkpoint for one log group; retains a one-minute overlap for delayed ingestion. */
+  public record LogCursor(
+      String group,
+      long startTime,
+      String nextToken,
+      long latestTimestamp,
+      Map<String, Long> seen) {
+    public LogCursor {
+      seen = Map.copyOf(seen);
+    }
+  }
+
+  public record LogBatch(List<FilteredLogEvent> events, LogCursor cursor) {
+    public LogBatch {
+      events = List.copyOf(events);
+    }
+  }
+
+  public LogBatch pollLogs(String group, LogCursor cursor, Duration follow)
       throws InterruptedException {
     if (follow.isNegative())
       throw new IllegalArgumentException("Nonnegative follow duration required");
+    if (cursor != null && !group.equals(cursor.group()))
+      throw new IllegalArgumentException("Cursor belongs to a different log group");
     long start = System.nanoTime();
-    String token = cursor;
+    long since =
+        cursor == null ? Instant.now().minusSeconds(60).toEpochMilli() : cursor.startTime();
+    long latest = cursor == null ? since : cursor.latestTimestamp();
+    String token = cursor == null ? null : cursor.nextToken();
+    var seen = new HashMap<String, Long>(cursor == null ? Map.of() : cursor.seen());
     do {
-      var request = FilterLogEventsRequest.builder().logGroupName(group).limit(1000);
-      if (token != null) request.nextToken(token);
-      else request.startTime(Instant.now().minusSeconds(60).toEpochMilli());
+      var request =
+          FilterLogEventsRequest.builder()
+              .logGroupName(group)
+              .limit(1000)
+              .startTime(since)
+              .nextToken(token);
       var result = logs.filterLogEvents(request.build());
-      if (!result.events().isEmpty() || System.nanoTime() - start >= follow.toNanos())
-        return result;
+      var events = new ArrayList<FilteredLogEvent>();
+      for (var event : result.events()) {
+        long timestamp = event.timestamp();
+        latest = Math.max(latest, timestamp);
+        if (seen.putIfAbsent(event.eventId(), timestamp) == null) events.add(event);
+      }
       token = result.nextToken();
-      Thread.sleep(Math.min(500, Math.max(1, follow.toMillis())));
+      if (token == null) {
+        // Advance only after all pages; keep overlap and IDs for late arrivals and equal
+        // timestamps.
+        since = Math.max(since, latest - 60_000);
+        long cutoff = since;
+        seen.values().removeIf(timestamp -> timestamp < cutoff);
+      }
+      var checkpoint = new LogCursor(group, since, token, latest, seen);
+      if (!events.isEmpty() || System.nanoTime() - start >= follow.toNanos())
+        return new LogBatch(events, checkpoint);
+      if (token == null) Thread.sleep(Math.min(500, Math.max(1, follow.toMillis())));
     } while (true);
   }
 }

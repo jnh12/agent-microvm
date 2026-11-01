@@ -318,7 +318,11 @@ public final class Infrastructure {
     }
     if (state.managed().contains("role")) {
       String name = out.get("role_name");
-      iam.deleteRolePolicy(r -> r.roleName(name).policyName("vmnest-build"));
+      try {
+        iam.deleteRolePolicy(r -> r.roleName(name).policyName("vmnest-build"));
+      } catch (software.amazon.awssdk.services.iam.model.NoSuchEntityException ignored) {
+        // Provisioning may have failed before the inline policy was created.
+      }
       for (String policy : state.attachedPolicies())
         iam.detachRolePolicy(r -> r.roleName(name).policyArn(policy));
       iam.deleteRole(r -> r.roleName(name));

@@ -75,14 +75,21 @@ class InfrastructureTest {
     assertEquals(List.of("headBucket"), calls);
   }
 
-  @Test
-  void partialFailureRetainsOwnershipAndDestroyOnlyOwnedResources() throws Exception {
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+  void partialFailureRetainsOwnershipAndDestroyOnlyOwnedResources(boolean policyAbsent)
+      throws Exception {
     var calls = new ArrayList<String>();
     var iam =
         ExtendedTest.fake(
             IamClient.class,
             (p, m, a) -> {
               calls.add(m.getName());
+              if (m.getName().equals("deleteRolePolicy")) {
+                if (policyAbsent)
+                  throw NoSuchEntityException.builder().message("Policy was never created").build();
+                throw IamException.builder().statusCode(403).message("Access denied").build();
+              }
               return m.getName().equals("createRole")
                   ? CreateRoleResponse.builder()
                       .role(Role.builder().arn("owned-role-arn").roleName("owned-role").build())
@@ -127,6 +134,12 @@ class InfrastructureTest {
     String saved = Files.readString(state);
     assertTrue(saved.contains("owned-role-arn"));
     assertTrue(saved.contains("owned-bucket"));
+    if (!policyAbsent) {
+      assertThrows(IamException.class, () -> infra.destroy(true));
+      assertFalse(calls.contains("deleteRole"));
+      assertTrue(Files.exists(state));
+      return;
+    }
     infra.destroy(true);
     assertTrue(calls.indexOf("deleteBucket") < calls.indexOf("deleteRole"));
     assertFalse(Files.exists(state));

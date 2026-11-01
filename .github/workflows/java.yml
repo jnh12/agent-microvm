@@ -2,10 +2,10 @@ name: Java SDK
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['sdk/io/**', 'tests/java/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/io/**', 'tests/java/**', 'tests/consumer/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
   push:
     branches: [main, develop]
-    paths: ['sdk/io/**', 'tests/java/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/io/**', 'tests/java/**', 'tests/consumer/**', 'gradle/**', 'gradlew*', '*.gradle', 'docs/java.md', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
 permissions:
   contents: read
 jobs:
@@ -19,6 +19,7 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
       - run: bash gradlew test build sdkDistribution
+      - run: bash gradlew -p tests/consumer compileJava
       - uses: actions/upload-artifact@v4
         with:
           name: vmnest-java

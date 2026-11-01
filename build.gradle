@@ -13,7 +13,7 @@ dependencies {
  api 'software.amazon.awssdk:lambdacore:2.57.8'
  api 'software.amazon.awssdk:ec2:2.57.8'
  implementation 'software.amazon.awssdk:url-connection-client:2.57.8'
- implementation 'com.fasterxml.jackson.core:jackson-databind:2.19.4'
+ api 'com.fasterxml.jackson.core:jackson-databind:2.19.4'
  testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

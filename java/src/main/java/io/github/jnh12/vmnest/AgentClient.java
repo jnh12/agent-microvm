@@ -9,7 +9,8 @@ import java.util.*;
 import java.util.function.Supplier;
 
 /** HTTP transport for the unchanged Python guest. No Python process on the caller. */
-public final class AgentClient {
+public final class AgentClient implements AutoCloseable {
+  private final boolean ownsHttp;
   private final HttpClient http;
   private final URI endpoint;
   private final Supplier<String> tokens;
@@ -24,15 +25,27 @@ public final class AgentClient {
         endpoint,
         tokens,
         port,
-        timeout);
+        timeout,
+        true);
   }
 
   /** Injected transport supports custom trust stores and local protocol tests. */
   public AgentClient(
       HttpClient http, URI endpoint, Supplier<String> tokens, int port, Duration timeout) {
+    this(http, endpoint, tokens, port, timeout, false);
+  }
+
+  private AgentClient(
+      HttpClient http,
+      URI endpoint,
+      Supplier<String> tokens,
+      int port,
+      Duration timeout,
+      boolean ownsHttp) {
+    this.ownsHttp = ownsHttp;
     if (!Set.of("http", "https").contains(endpoint.getScheme()) || endpoint.getHost() == null)
       throw new IllegalArgumentException("Absolute HTTP(S) endpoint required");
-    if (port < 1 || port > 65535 || port == 9000)
+    if (port < 1 || port > 65535 || port == Ports.hook())
       throw new IllegalArgumentException("Invalid or reserved port");
     if (timeout.isNegative() || timeout.isZero())
       throw new IllegalArgumentException("Positive timeout required");
@@ -41,6 +54,11 @@ public final class AgentClient {
     this.tokens = tokens;
     this.port = port;
     this.timeout = timeout;
+  }
+
+  @Override
+  public void close() {
+    if (ownsHttp) http.close();
   }
 
   public boolean health() throws IOException, InterruptedException {

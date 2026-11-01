@@ -20,8 +20,8 @@ public final class Sandbox implements AutoCloseable {
 
   private Sandbox(String name, String id, ControlPlane control, int port, Duration requestTimeout) {
     if (name == null || name.isBlank() || name.getBytes(StandardCharsets.UTF_8).length > 128)
-      throw new IllegalArgumentException("Name must be 1–128 UTF-8 bytes");
-    if (port < 1 || port > 65535 || port == 9000)
+      throw new IllegalArgumentException("Name must be 1â€“128 UTF-8 bytes");
+    if (port < 1 || port > 65535 || port == Ports.hook())
       throw new IllegalArgumentException("Invalid or reserved agent port");
     if (requestTimeout.isNegative() || requestTimeout.isZero())
       throw new IllegalArgumentException("Positive request timeout required");
@@ -60,8 +60,15 @@ public final class Sandbox implements AutoCloseable {
     var sandbox = new Sandbox(name, id, control, port, requestTimeout);
     // On wait failure the exception includes the ID for reconciliation; do not launch again
     // blindly.
-    sandbox.info = control.waitUntilRunning(id, waitTimeout, Duration.ofSeconds(1));
-    sandbox.connect();
+    try {
+      sandbox.info = control.waitUntilRunning(id, waitTimeout, Duration.ofSeconds(1));
+      sandbox.connect();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new InterruptedException("Interrupted waiting for launched VM " + id);
+    } catch (RuntimeException | TimeoutException e) {
+      throw new LaunchException(id, e);
+    }
     return sandbox;
   }
 
@@ -74,6 +81,7 @@ public final class Sandbox implements AutoCloseable {
   }
 
   private void connect() {
+    if (agent != null) agent.close();
     String endpoint = info.endpoint();
     if (endpoint == null || endpoint.isBlank()) {
       agent = null;
@@ -112,7 +120,11 @@ public final class Sandbox implements AutoCloseable {
   }
 
   public String state() {
-    return switch (Objects.toString(info.stateAsString(), "")) {
+    return normalizedState(info.stateAsString());
+  }
+
+  public static String normalizedState(String state) {
+    return switch (Objects.toString(state, "")) {
       case "PENDING", "STARTING", "RESUMING" -> "pending";
       case "RUNNING", "SUSPENDING" -> "running";
       case "SUSPENDED" -> "suspended";
@@ -135,6 +147,45 @@ public final class Sandbox implements AutoCloseable {
   public AgentClient agent() {
     if (agent == null || terminated) throw new IllegalStateException("Guest unavailable");
     return agent;
+  }
+
+  public ExecResult shell(String command, String cwd, Map<String, String> env, Duration timeout)
+      throws IOException, InterruptedException {
+    return exec("bash", List.of("-lc", command), cwd, env, timeout);
+  }
+
+  public PortForward forward(int remotePort, int localPort) throws IOException {
+    String address = endpoint();
+    URI uri = URI.create(address.contains("://") ? address : "https://" + address);
+    return new PortForward(
+        uri,
+        remotePort,
+        localPort,
+        () ->
+            control
+                .aws()
+                .createMicrovmAuthToken(
+                    r ->
+                        r.microvmIdentifier(id)
+                            .expirationInMinutes(30)
+                            .allowedPorts(p -> p.port(remotePort)))
+                .authToken()
+                .get("X-aws-proxy-auth"));
+  }
+
+  public String waitFor(String target, Duration timeout, Duration interval)
+      throws InterruptedException, TimeoutException {
+    if (timeout.isNegative() || timeout.isZero() || interval.isNegative() || interval.isZero())
+      throw new IllegalArgumentException("Positive durations required");
+    long start = System.nanoTime();
+    do {
+      String observed = refresh();
+      if (observed.equals(target)) return observed;
+      if (observed.equals("failed") || observed.equals("stopped"))
+        throw new IllegalStateException("VM entered " + observed);
+      Thread.sleep(Math.max(1, Math.min(interval.toMillis(), timeout.toMillis())));
+    } while (System.nanoTime() - start < timeout.toNanos());
+    throw new TimeoutException("VM " + id + " did not reach " + target);
   }
 
   public ExecResult exec(
@@ -169,6 +220,7 @@ public final class Sandbox implements AutoCloseable {
     if (!terminated) {
       control.aws().terminateMicrovm(r -> r.microvmIdentifier(id));
       terminated = true;
+      if (agent != null) agent.close();
       agent = null;
     }
   }

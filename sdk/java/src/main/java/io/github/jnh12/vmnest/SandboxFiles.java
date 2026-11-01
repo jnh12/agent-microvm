@@ -63,7 +63,9 @@ public final class SandboxFiles {
             + "p=sys.argv[1]\n"
             + "r=[]\n"
             + "for n in sorted(os.listdir(p)):\n"
-            + " f=os.path.join(p,n);s=os.lstat(f);r.append(dict(name=n,is_dir=os.path.isdir(f),is_symlink=os.path.islink(f),size=s.st_size,mode=oct(s.st_mode),mtime=int(s.st_mtime)))\n"
+            + " try:\n"
+            + "  f=os.path.join(p,n);s=os.lstat(f);r.append(dict(name=n,is_dir=os.path.isdir(f),is_symlink=os.path.islink(f),size=s.st_size,mode=oct(s.st_mode),mtime=int(s.st_mtime)))\n"
+            + " except OSError as e: r.append(dict(name=n,error=str(e)))\n"
             + "print(json.dumps(r))",
         absolute(path));
   }
@@ -85,35 +87,22 @@ public final class SandboxFiles {
     python("import os,sys;os.makedirs(sys.argv[1],exist_ok=True);print('null')", absolute(path));
   }
 
+  private void command(String executable, String... args) throws IOException, InterruptedException {
+    var result = agent.exec(executable, List.of(args), null, null, timeout);
+    if (!result.success())
+      throw new IOException("Guest filesystem command failed: " + result.stderrText());
+  }
+
   public void remove(String path, boolean recursive) throws IOException, InterruptedException {
-    python(
-        "import os,sys,shutil\n"
-            + "p=sys.argv[1]\n"
-            + "if os.path.isdir(p) and not os.path.islink(p):\n"
-            + " if sys.argv[2]=='true': shutil.rmtree(p)\n"
-            + " else: os.rmdir(p)\n"
-            + "elif os.path.lexists(p): os.unlink(p)\n"
-            + "print('null')",
-        absolute(path),
-        Boolean.toString(recursive));
+    command("rm", recursive ? "-rf" : "-f", "--", absolute(path));
   }
 
   public void copy(String src, String dst) throws IOException, InterruptedException {
-    python(
-        "import os,sys,shutil\n"
-            + "s,d=sys.argv[1:]\n"
-            + "if os.path.isdir(s): shutil.copytree(s,d,dirs_exist_ok=True)\n"
-            + "else: shutil.copy2(s,d)\n"
-            + "print('null')",
-        absolute(src),
-        absolute(dst));
+    command("cp", "-r", "--", absolute(src), absolute(dst));
   }
 
   public void rename(String src, String dst) throws IOException, InterruptedException {
-    python(
-        "import sys,shutil;shutil.move(sys.argv[1],sys.argv[2]);print('null')",
-        absolute(src),
-        absolute(dst));
+    command("mv", "--", absolute(src), absolute(dst));
   }
 
   private Path allowed(Path path) throws IOException {

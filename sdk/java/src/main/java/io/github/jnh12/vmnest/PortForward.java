@@ -32,17 +32,19 @@ public final class PortForward implements AutoCloseable {
 
   public PortForward(URI endpoint, int remotePort, int localPort, Supplier<String> token)
       throws IOException {
+    this(endpoint, remotePort, localPort, token, true);
+  }
+
+  public PortForward(
+      URI endpoint, int remotePort, int localPort, Supplier<String> token, boolean verifyTls)
+      throws IOException {
     if (remotePort < 1 || remotePort > 65535 || remotePort == Ports.hook())
       throw new IllegalArgumentException("Invalid or reserved port");
     if (!"https".equals(endpoint.getScheme())
         && !("http".equals(endpoint.getScheme())
             && Set.of("localhost", "127.0.0.1").contains(endpoint.getHost())))
       throw new IllegalArgumentException("HTTPS endpoint required");
-    http =
-        HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
+    http = Tls.client(verifyTls);
     server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     server.setExecutor(workers);
     server.createContext(
@@ -121,7 +123,9 @@ public final class PortForward implements AutoCloseable {
         });
     server.start();
     try {
-      gateway = new WebSocketForward(endpoint, remotePort, localPort, token, server.getAddress());
+      gateway =
+          new WebSocketForward(
+              endpoint, remotePort, localPort, token, server.getAddress(), verifyTls);
     } catch (IOException | RuntimeException e) {
       server.stop(0);
       workers.shutdownNow();

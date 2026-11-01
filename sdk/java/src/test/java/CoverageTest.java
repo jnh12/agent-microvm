@@ -11,10 +11,10 @@ class CoverageTest {
   @Test
   void allPythonOperationsHaveCallableJavaMappings() throws Exception {
     Map<String, String> mapping = new LinkedHashMap<>();
-    add(mapping, RuntimeConfig.class, "check", "runtime_check");
+    add(mapping, RuntimeConfig.class, "diagnostics", "runtime_check");
     add(mapping, RuntimeConfig.class, "installationHelp", "runtime_install");
     add(mapping, Infrastructure.class, "outputs", "infra_outputs");
-    add(mapping, Infrastructure.class, "list", "infra_list");
+    add(mapping, Infrastructure.class, "listStacks", "infra_list");
     add(mapping, SandboxRegistry.class, "run", "sandbox_run");
     add(mapping, SandboxRegistry.class, "create", "sandbox_create");
     add(mapping, Sandbox.class, "start", "sandbox_start");

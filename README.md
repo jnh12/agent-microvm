@@ -155,7 +155,7 @@ The `vmnest` CLI and MCP server are distributed with the Python package.
 | SDKs | Python: `agent_sandbox.Sandbox`; Java: `io.github.jnh12.vmnest.Sandbox` |
 | Transport | Both SDKs use HTTPS + `X-aws-proxy-auth` through their `AgentClient` |
 | CLI | `vmnest` |
-| Infrastructure | Python: `vmnest infra` / `agent_sandbox.infra`, configured through `sandbox.yaml`; Java: `Infrastructure` with typed configuration |
+| Infrastructure | Python: `vmnest infra` / `agent_sandbox.infra`, configured through `sandbox.yaml`; Java: `Infrastructure` with the same `sandbox.yaml` schema or typed configuration |
 | MCP server | `agent_sandbox_mcp` (FastMCP server, optional `[mcp]` extra, launched with `vmnest mcp`) |
 
 ## Architecture

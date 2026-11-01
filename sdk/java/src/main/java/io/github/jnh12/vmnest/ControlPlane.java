@@ -18,6 +18,33 @@ public final class ControlPlane {
     return aws;
   }
 
+  public RunMicrovmResponse runMicrovm(RunMicrovmRequest request) throws InterruptedException {
+    return runMicrovm(request, Duration.ofSeconds(180));
+  }
+
+  public RunMicrovmResponse runMicrovm(RunMicrovmRequest request, Duration retryTimeout)
+      throws InterruptedException {
+    if (retryTimeout.isNegative())
+      throw new IllegalArgumentException("Nonnegative retry timeout required");
+    var stable =
+        request.clientToken() == null
+            ? request.toBuilder().clientToken(java.util.UUID.randomUUID().toString()).build()
+            : request;
+    return Retry.call(
+        () -> aws.runMicrovm(stable),
+        e -> {
+          if (!(e instanceof LambdaMicrovmsException failure)) return false;
+          String code =
+              failure.awsErrorDetails() == null
+                  ? failure.getClass().getSimpleName()
+                  : failure.awsErrorDetails().errorCode();
+          return java.util.Set.of(
+                  "ResourceNotFoundException", "ThrottlingException", "TooManyRequestsException")
+              .contains(code);
+        },
+        retryTimeout);
+  }
+
   public GetMicrovmResponse waitUntilRunning(String id, Duration timeout, Duration interval)
       throws InterruptedException, TimeoutException {
     if (timeout.isNegative() || timeout.isZero() || interval.isNegative() || interval.isZero())
@@ -25,7 +52,8 @@ public final class ControlPlane {
     long start = System.nanoTime();
     while (System.nanoTime() - start < timeout.toNanos()) {
       var info = aws.getMicrovm(r -> r.microvmIdentifier(id));
-      String state = info.stateAsString();
+      String state =
+          java.util.Objects.toString(info.stateAsString(), "").toUpperCase(java.util.Locale.ROOT);
       if ("RUNNING".equals(state)) return info;
       if ("FAILED".equals(state) || "TERMINATED".equals(state))
         throw new IllegalStateException("VM " + id + " entered " + state);

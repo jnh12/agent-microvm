@@ -90,6 +90,19 @@ class InfrastructureTest {
                   throw NoSuchEntityException.builder().message("Policy was never created").build();
                 throw IamException.builder().statusCode(403).message("Access denied").build();
               }
+              if (m.getName().equals("listRolePoliciesPaginator"))
+                return new software.amazon.awssdk.services.iam.paginators.ListRolePoliciesIterable(
+                    (IamClient) p,
+                    ListRolePoliciesRequest.builder().roleName("owned-role").build());
+              if (m.getName().equals("listRolePolicies"))
+                return ListRolePoliciesResponse.builder().build();
+              if (m.getName().equals("listAttachedRolePoliciesPaginator"))
+                return new software.amazon.awssdk.services.iam.paginators
+                    .ListAttachedRolePoliciesIterable(
+                    (IamClient) p,
+                    ListAttachedRolePoliciesRequest.builder().roleName("owned-role").build());
+              if (m.getName().equals("listAttachedRolePolicies"))
+                return ListAttachedRolePoliciesResponse.builder().build();
               return m.getName().equals("createRole")
                   ? CreateRoleResponse.builder()
                       .role(Role.builder().arn("owned-role-arn").roleName("owned-role").build())

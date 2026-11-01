@@ -9,12 +9,65 @@ import java.util.*;
 import java.util.concurrent.TimeoutException;
 import software.amazon.awssdk.services.lambdamicrovms.model.*;
 
-/** Persistent names for a single application process. AWS client region must match the registry. */
+/** Persistent sandbox names, endpoints and regions, compatible with the Python state store. */
 public final class SandboxRegistry implements AutoCloseable {
   private final FileChannel lockChannel;
   private final java.nio.channels.FileLock fileLock;
 
-  public record Entry(String name, String microvmId, int agentPort) {}
+  public record Entry(
+      String name,
+      String microvmId,
+      int agentPort,
+      String endpoint,
+      String imageArn,
+      String region) {
+    public Entry(String name, String microvmId, int agentPort) {
+      this(name, microvmId, agentPort, null, null, null);
+    }
+  }
+
+  private final Map<String, ControlPlane> regional = new HashMap<>();
+  private java.util.function.Function<String, ControlPlane> regionResolver;
+
+  public static Path defaultPath() {
+    return Path.of(
+        System.getenv()
+            .getOrDefault(
+                "AGENT_SANDBOX_STATE",
+                Path.of(System.getProperty("user.home"), ".agent_sandbox", "state.json")
+                    .toString()));
+  }
+
+  public SandboxRegistry(ControlPlane control) throws IOException {
+    this(defaultPath(), control);
+  }
+
+  public SandboxRegistry(
+      Path file, ControlPlane control, java.util.function.Function<String, ControlPlane> resolver)
+      throws IOException {
+    this(file, control);
+    regionResolver = resolver;
+  }
+
+  private String region() {
+    var config = control.aws().serviceClientConfiguration();
+    return config == null || config.region() == null ? null : config.region().id();
+  }
+
+  private ControlPlane forEntry(Entry entry) {
+    if (entry.region() == null || entry.region().equals(region())) return control;
+    if (regionResolver != null) return regionResolver.apply(entry.region());
+    return regional.computeIfAbsent(
+        entry.region(),
+        r -> {
+          var builder =
+              software.amazon.awssdk.services.lambdamicrovms.LambdaMicrovmsClient.builder()
+                  .region(software.amazon.awssdk.regions.Region.of(r));
+          var config = control.aws().serviceClientConfiguration();
+          if (config != null) builder.credentialsProvider(config.credentialsProvider());
+          return new ControlPlane(builder.build());
+        });
+  }
 
   private final Path file;
   private final ControlPlane control;
@@ -40,6 +93,7 @@ public final class SandboxRegistry implements AutoCloseable {
 
   @Override
   public void close() throws IOException {
+    regional.values().forEach(cp -> cp.aws().close());
     fileLock.release();
     lockChannel.close();
   }
@@ -47,8 +101,25 @@ public final class SandboxRegistry implements AutoCloseable {
   private Map<String, Entry> load() throws IOException {
     if (!Files.exists(file)) return new TreeMap<>();
     var map = new TreeMap<String, Entry>();
-    for (var entry : json.readValue(Files.readAllBytes(file), Entry[].class))
-      map.put(entry.name(), entry);
+    var root = json.readTree(file.toFile());
+    if (root.isArray()) {
+      for (var entry : json.treeToValue(root, Entry[].class)) map.put(entry.name(), entry);
+    } else {
+      var records = root.path("sandboxes").fields();
+      while (records.hasNext()) {
+        var record = records.next();
+        var value = record.getValue();
+        var entry =
+            new Entry(
+                record.getKey(),
+                value.path("microvm_id").asText(),
+                root.path("java_agent_ports").path(record.getKey()).asInt(Ports.agent()),
+                value.path("endpoint").asText(null),
+                value.path("image_arn").asText(null),
+                value.path("region").asText(null));
+        map.put(entry.name(), entry);
+      }
+    }
     return map;
   }
 
@@ -56,7 +127,20 @@ public final class SandboxRegistry implements AutoCloseable {
     Files.createDirectories(file.getParent());
     Path tmp = Files.createTempFile(file.getParent(), "registry-", ".tmp");
     try {
-      json.writeValue(tmp.toFile(), entries.values());
+      var root = json.createObjectNode();
+      var sandboxes = root.putObject("sandboxes");
+      var ports = root.putObject("java_agent_ports");
+      for (var entry : entries.values()) {
+        sandboxes
+            .putObject(entry.name())
+            .put("name", entry.name())
+            .put("microvm_id", entry.microvmId())
+            .put("endpoint", entry.endpoint())
+            .put("image_arn", entry.imageArn())
+            .put("region", entry.region());
+        ports.put(entry.name(), entry.agentPort());
+      }
+      json.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), root);
       try {
         Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
       } catch (AtomicMoveNotSupportedException e) {
@@ -78,7 +162,7 @@ public final class SandboxRegistry implements AutoCloseable {
         out.put(
             entry.name(),
             Sandbox.normalizedState(
-                control
+                forEntry(entry)
                     .aws()
                     .getMicrovm(r -> r.microvmIdentifier(entry.microvmId()))
                     .stateAsString()));
@@ -93,7 +177,12 @@ public final class SandboxRegistry implements AutoCloseable {
     var entry = load().get(name);
     if (entry == null) throw new IllegalArgumentException("Unknown sandbox: " + name);
     return Sandbox.attach(
-        name, entry.microvmId(), control, entry.agentPort(), Duration.ofMinutes(5));
+        name,
+        entry.microvmId(),
+        forEntry(entry),
+        entry.agentPort(),
+        Duration.ofMinutes(5),
+        entry.endpoint());
   }
 
   public synchronized void attach(String name, String id, int port) throws IOException {
@@ -106,8 +195,8 @@ public final class SandboxRegistry implements AutoCloseable {
         || port > 65535
         || port == Ports.hook())
       throw new IllegalArgumentException("Invalid sandbox configuration");
-    control.aws().getMicrovm(r -> r.microvmIdentifier(id));
-    entries.put(name, new Entry(name, id, port));
+    var info = control.aws().getMicrovm(r -> r.microvmIdentifier(id));
+    entries.put(name, new Entry(name, id, port, info.endpoint(), info.imageArn(), region()));
     save(entries);
   }
 
@@ -126,8 +215,8 @@ public final class SandboxRegistry implements AutoCloseable {
     if (entries.containsKey(name)) throw new IllegalArgumentException("Duplicate name");
     var b = request.toBuilder();
     if (request.clientToken() == null) b.clientToken(UUID.randomUUID().toString());
-    String id = control.aws().runMicrovm(b.build()).microvmId();
-    entries.put(name, new Entry(name, id, port));
+    String id = control.runMicrovm(b.build()).microvmId();
+    entries.put(name, new Entry(name, id, port, null, request.imageIdentifier(), region()));
     try {
       save(entries);
     } catch (IOException e) {
@@ -146,7 +235,10 @@ public final class SandboxRegistry implements AutoCloseable {
     var entries = load();
     var entry = entries.get(name);
     if (entry == null) throw new IllegalArgumentException("Unknown sandbox");
-    control.aws().terminateMicrovm(r -> r.microvmIdentifier(entry.microvmId()));
+    try {
+      forEntry(entry).aws().terminateMicrovm(r -> r.microvmIdentifier(entry.microvmId()));
+    } catch (ResourceNotFoundException ignored) {
+    }
     entries.remove(name);
     save(entries);
   }
@@ -155,7 +247,12 @@ public final class SandboxRegistry implements AutoCloseable {
       throws Exception {
     try (var sandbox =
         Sandbox.create(
-            name, control, request, 8080, Duration.ofMinutes(2), timeout.plusSeconds(30))) {
+            name,
+            control,
+            request,
+            Ports.agent(),
+            Duration.ofMinutes(2),
+            timeout.plusSeconds(30))) {
       return sandbox.exec("bash", List.of("-lc", command), null, null, timeout);
     }
   }

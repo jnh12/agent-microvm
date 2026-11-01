@@ -50,7 +50,12 @@ public final class Networking {
 
   public static void deleteSecurityGroup(Ec2Client ec2, String id, boolean confirm) {
     if (!confirm) throw new IllegalArgumentException("confirm=true required");
-    ec2.deleteSecurityGroup(r -> r.groupId(id));
+    try {
+      ec2.deleteSecurityGroup(r -> r.groupId(id));
+    } catch (Ec2Exception e) {
+      String code = e.awsErrorDetails() == null ? "" : e.awsErrorDetails().errorCode();
+      if (!Set.of("InvalidGroup.NotFound", "InvalidGroupId.NotFound").contains(code)) throw e;
+    }
   }
 
   public static CreateRoleRequest operatorRole(String name) throws IOException {
@@ -97,8 +102,42 @@ public final class Networking {
 
   public static void deleteOperatorRole(IamClient iam, String name, boolean confirm) {
     if (!confirm) throw new IllegalArgumentException("confirm=true required");
-    iam.deleteRolePolicy(r -> r.roleName(name).policyName("vmnest-network"));
-    iam.deleteRole(r -> r.roleName(name));
+    deleteRole(iam, name);
+  }
+
+  public static void deleteRole(IamClient iam, String name) {
+    try {
+      for (var page : iam.listRolePoliciesPaginator(r -> r.roleName(name)))
+        for (String policy : page.policyNames())
+          try {
+            iam.deleteRolePolicy(r -> r.roleName(name).policyName(policy));
+          } catch (software.amazon.awssdk.services.iam.model.NoSuchEntityException ignored) {
+          }
+      for (var page : iam.listAttachedRolePoliciesPaginator(r -> r.roleName(name)))
+        for (var policy : page.attachedPolicies())
+          try {
+            iam.detachRolePolicy(r -> r.roleName(name).policyArn(policy.policyArn()));
+          } catch (software.amazon.awssdk.services.iam.model.NoSuchEntityException ignored) {
+          }
+      iam.deleteRole(r -> r.roleName(name));
+    } catch (software.amazon.awssdk.services.iam.model.NoSuchEntityException ignored) {
+    }
+  }
+
+  public static software.amazon.awssdk.services.lambdacore.model.CreateNetworkConnectorResponse
+      createConnector(
+          software.amazon.awssdk.services.lambdacore.LambdaCoreClient core,
+          CreateNetworkConnectorRequest request)
+          throws InterruptedException {
+    return Retry.call(
+        () -> core.createNetworkConnector(request),
+        e -> {
+          String message = Objects.toString(e.getMessage(), "").toLowerCase(Locale.ROOT);
+          return e instanceof software.amazon.awssdk.services.lambdacore.model.LambdaCoreException
+              && message.contains("assume")
+              && message.contains("role");
+        },
+        java.time.Duration.ofSeconds(120));
   }
 
   public static CreateNetworkConnectorRequest connector(

@@ -20,13 +20,12 @@ public final class AgentClient implements AutoCloseable {
   private volatile String token;
 
   public AgentClient(URI endpoint, Supplier<String> tokens, int port, Duration timeout) {
-    this(
-        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(),
-        endpoint,
-        tokens,
-        port,
-        timeout,
-        true);
+    this(endpoint, tokens, port, timeout, true);
+  }
+
+  public AgentClient(
+      URI endpoint, Supplier<String> tokens, int port, Duration timeout, boolean verifyTls) {
+    this(Tls.client(verifyTls), endpoint, tokens, port, timeout, true);
   }
 
   /** Injected transport supports custom trust stores and local protocol tests. */
@@ -62,7 +61,11 @@ public final class AgentClient implements AutoCloseable {
   }
 
   public boolean health() throws IOException, InterruptedException {
-    return request("/healthz", null).statusCode() == 200;
+    try {
+      return request("/healthz", null).statusCode() == 200;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   private HttpResponse<String> request(String path, Object body)

@@ -38,6 +38,55 @@ public final class Images {
     }
   }
 
+  public static boolean isGuestDirectory(Path path) {
+    return Files.isDirectory(path) && Files.isRegularFile(path.resolve("Dockerfile"));
+  }
+
+  public static Path resolveGuestDirectory(Path candidate, boolean allowBundledFallback)
+      throws IOException {
+    if (isGuestDirectory(candidate)) return candidate.toAbsolutePath().normalize();
+    if (!allowBundledFallback)
+      throw new IOException("Guest source requires a Dockerfile: " + candidate);
+    Path bundled = Files.createTempDirectory("vmnest-guest-");
+    extractBundledGuest(bundled);
+    try (var paths = Files.walk(bundled)) {
+      paths.sorted().forEach(path -> path.toFile().deleteOnExit());
+    }
+    return bundled;
+  }
+
+  public String latestBaseImage() {
+    return managed().stream()
+        .max(
+            Comparator.comparing(
+                ManagedMicrovmImageSummary::createdAt,
+                Comparator.nullsFirst(Comparator.naturalOrder())))
+        .orElseThrow(() -> new IllegalStateException("No managed base images available"))
+        .imageArn();
+  }
+
+  public static Hooks defaultHooks() {
+    return Hooks.builder()
+        .port(Ports.hook())
+        .microvmImageHooks(
+            h ->
+                h.ready("ENABLED")
+                    .readyTimeoutInSeconds(60)
+                    .validate("ENABLED")
+                    .validateTimeoutInSeconds(15))
+        .microvmHooks(
+            h ->
+                h.run("ENABLED")
+                    .runTimeoutInSeconds(5)
+                    .resume("ENABLED")
+                    .resumeTimeoutInSeconds(5)
+                    .suspend("ENABLED")
+                    .suspendTimeoutInSeconds(10)
+                    .terminate("ENABLED")
+                    .terminateTimeoutInSeconds(10))
+        .build();
+  }
+
   public List<MicrovmImageSummary> list() {
     var out = new ArrayList<MicrovmImageSummary>();
     for (var page : aws.listMicrovmImagesPaginator(ListMicrovmImagesRequest.builder().build()))
@@ -59,7 +108,10 @@ public final class Images {
 
   public void remove(String arn, boolean confirm) {
     if (!confirm) throw new IllegalArgumentException("confirm=true required");
-    aws.deleteMicrovmImage(r -> r.imageIdentifier(arn));
+    try {
+      aws.deleteMicrovmImage(r -> r.imageIdentifier(arn));
+    } catch (ResourceNotFoundException ignored) {
+    }
   }
 
   public List<String> prune(boolean confirm) {
@@ -117,8 +169,11 @@ public final class Images {
     try {
       archive(source, archive);
       s3.putObject(r -> r.bucket(bucket).key(key), RequestBody.fromFile(archive));
-      return aws.createMicrovmImage(
-          settings.toBuilder().codeArtifact(c -> c.uri("s3://" + bucket + "/" + key)).build());
+      var request = settings.toBuilder().codeArtifact(c -> c.uri("s3://" + bucket + "/" + key));
+      if (settings.baseImageArn() == null || settings.baseImageArn().isBlank())
+        request.baseImageArn(latestBaseImage());
+      if (settings.hooks() == null) request.hooks(defaultHooks());
+      return aws.createMicrovmImage(request.build());
     } finally {
       Files.deleteIfExists(archive);
     }
@@ -141,7 +196,11 @@ public final class Images {
         return image;
       if (image.latestFailedImageVersion() != null
           && (expectedVersion == null || expectedVersion.equals(image.latestFailedImageVersion())))
-        throw new IllegalStateException("Image build failed");
+        throw new IllegalStateException(
+            "Image build failed: "
+                + aws.getMicrovmImageVersion(
+                        r -> r.imageIdentifier(arn).imageVersion(image.latestFailedImageVersion()))
+                    .stateReason());
       Thread.sleep(1000);
     }
     throw new TimeoutException("Image did not become active");

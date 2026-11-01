@@ -27,7 +27,10 @@ class ExtendedTest {
   static <T> T fake(Class<T> type, java.lang.reflect.InvocationHandler handler) {
     return (T)
         java.lang.reflect.Proxy.newProxyInstance(
-            type.getClassLoader(), new Class[] {type}, handler);
+            type.getClassLoader(),
+            new Class[] {type},
+            (p, m, a) ->
+                m.getName().equals("serviceClientConfiguration") ? null : handler.invoke(p, m, a));
   }
 
   @Test

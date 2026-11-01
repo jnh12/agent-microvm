@@ -17,10 +17,18 @@ public final class Sandbox implements AutoCloseable {
   private GetMicrovmResponse info;
   private AgentClient agent;
   private boolean terminated;
+  private boolean verifyTls = true;
+
+  /** Configure guest TLS verification for this handle and subsequent forwarding/resume. */
+  public Sandbox verifyTls(boolean verify) {
+    verifyTls = verify;
+    if (info != null) connect();
+    return this;
+  }
 
   private Sandbox(String name, String id, ControlPlane control, int port, Duration requestTimeout) {
     if (name == null || name.isBlank() || name.getBytes(StandardCharsets.UTF_8).length > 128)
-      throw new IllegalArgumentException("Name must be 1â€“128 UTF-8 bytes");
+      throw new IllegalArgumentException("Name must be 1-128 UTF-8 bytes");
     if (port < 1 || port > 65535 || port == Ports.hook())
       throw new IllegalArgumentException("Invalid or reserved agent port");
     if (requestTimeout.isNegative() || requestTimeout.isZero())
@@ -56,7 +64,7 @@ public final class Sandbox implements AutoCloseable {
     var resolved = builder.build();
     if (resolved.imageIdentifier() == null || resolved.executionRoleArn() == null)
       throw new IllegalArgumentException("Image and execution role required");
-    String id = control.aws().runMicrovm(resolved).microvmId();
+    String id = control.runMicrovm(resolved).microvmId();
     var sandbox = new Sandbox(name, id, control, port, requestTimeout);
     // On wait failure the exception includes the ID for reconciliation; do not launch again
     // blindly.
@@ -74,8 +82,21 @@ public final class Sandbox implements AutoCloseable {
 
   public static Sandbox attach(
       String name, String id, ControlPlane control, int port, Duration requestTimeout) {
+    return attach(name, id, control, port, requestTimeout, null);
+  }
+
+  public static Sandbox attach(
+      String name,
+      String id,
+      ControlPlane control,
+      int port,
+      Duration requestTimeout,
+      String fallbackEndpoint) {
     var sandbox = new Sandbox(name, id, control, port, requestTimeout);
     sandbox.inspect();
+    if ((sandbox.info.endpoint() == null || sandbox.info.endpoint().isBlank())
+        && fallbackEndpoint != null)
+      sandbox.info = sandbox.info.toBuilder().endpoint(fallbackEndpoint).build();
     sandbox.connect();
     return sandbox;
   }
@@ -104,7 +125,8 @@ public final class Sandbox implements AutoCloseable {
                     .authToken()
                     .get("X-aws-proxy-auth"),
             port,
-            requestTimeout);
+            requestTimeout,
+            verifyTls);
   }
 
   public String name() {
@@ -124,7 +146,7 @@ public final class Sandbox implements AutoCloseable {
   }
 
   public static String normalizedState(String state) {
-    return switch (Objects.toString(state, "")) {
+    return switch (Objects.toString(state, "").toUpperCase(Locale.ROOT)) {
       case "PENDING", "STARTING", "RESUMING" -> "pending";
       case "RUNNING", "SUSPENDING" -> "running";
       case "SUSPENDED" -> "suspended";
@@ -170,7 +192,8 @@ public final class Sandbox implements AutoCloseable {
                             .expirationInMinutes(30)
                             .allowedPorts(p -> p.port(remotePort)))
                 .authToken()
-                .get("X-aws-proxy-auth"));
+                .get("X-aws-proxy-auth"),
+        verifyTls);
   }
 
   public String waitFor(String target, Duration timeout, Duration interval)

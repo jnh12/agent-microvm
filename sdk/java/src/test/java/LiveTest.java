@@ -65,6 +65,14 @@ class LiveTest {
           assertTrue(files.exists("binary"));
           assertEquals(3, files.stat("binary").path("size").asInt());
           assertEquals(1, files.list(".").size());
+          files.mkdir("source");
+          files.write("source/value", new byte[] {9});
+          files.mkdir("target");
+          files.copy("source", "target");
+          assertArrayEquals(new byte[] {9}, files.read("target/source/value"));
+          files.mkdir("empty");
+          assertThrows(java.io.IOException.class, () -> files.remove("empty", false));
+          files.remove("empty", true);
           files.copy("binary", "copy");
           files.rename("copy", "renamed");
           files.remove("renamed", false);

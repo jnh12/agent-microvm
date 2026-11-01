@@ -58,6 +58,8 @@ public final class Infrastructure {
   private final LambdaMicrovmsClient vm;
   private final LambdaCoreClient core;
   private final Path journal;
+  private String sharedStack;
+  private software.amazon.awssdk.services.ec2.Ec2Client ec2;
   private final ObjectMapper json = new ObjectMapper();
 
   public Infrastructure(
@@ -67,6 +69,71 @@ public final class Infrastructure {
     this.vm = vm;
     this.core = core;
     this.journal = journal.toAbsolutePath();
+  }
+
+  public record NetworkSpec(
+      String name,
+      String vpcId,
+      List<String> subnetIds,
+      String securityGroupId,
+      String operatorRoleArn) {
+    public NetworkSpec {
+      subnetIds = List.copyOf(subnetIds);
+    }
+  }
+
+  public Infrastructure(
+      IamClient iam,
+      S3Client s3,
+      LambdaMicrovmsClient vm,
+      LambdaCoreClient core,
+      software.amazon.awssdk.services.ec2.Ec2Client ec2,
+      Path journal) {
+    this(iam, s3, vm, core, journal);
+    this.ec2 = ec2;
+  }
+
+  public static Infrastructure forConfig(
+      InfraConfig config,
+      IamClient iam,
+      S3Client s3,
+      LambdaMicrovmsClient vm,
+      LambdaCoreClient core,
+      software.amazon.awssdk.services.ec2.Ec2Client ec2,
+      Path stateFile) {
+    var infrastructure =
+        new Infrastructure(
+            iam, s3, vm, core, ec2, stateFile == null ? InfraConfig.defaultStatePath() : stateFile);
+    infrastructure.sharedStack = config.project() + "/" + config.stack();
+    return infrastructure;
+  }
+
+  public Map<String, String> up(InfraConfig config, boolean rebuild, Duration timeout)
+      throws Exception {
+    return up(config.spec(outputs()), config.network(), rebuild, timeout);
+  }
+
+  public static Map<String, Map<String, String>> listStacks(Path stateFile) throws IOException {
+    return InfrastructureState.list(stateFile == null ? InfraConfig.defaultStatePath() : stateFile);
+  }
+
+  public Map<String, String> plan(InfraConfig config) throws IOException {
+    var result = new LinkedHashMap<>(plan(config.spec(outputs())));
+    var network = config.network();
+    if (network != null) {
+      result.put("connector", "create");
+      result.put(
+          "security_group",
+          network.securityGroupId() == null || network.securityGroupId().isBlank()
+              ? "create"
+              : "reuse");
+      result.put(
+          "network_operator_role",
+          network.operatorRoleArn() == null || network.operatorRoleArn().isBlank()
+              ? "create"
+              : "reuse");
+    }
+    return Map.copyOf(result);
   }
 
   public Map<String, String> plan(Spec spec) {
@@ -84,12 +151,17 @@ public final class Infrastructure {
   }
 
   private State load() throws IOException {
+    if (sharedStack != null) return InfrastructureState.load(journal, sharedStack);
     return Files.exists(journal)
         ? json.readValue(journal.toFile(), State.class)
         : new State(Map.of(), Set.of(), List.of());
   }
 
   private void save(State state) throws IOException {
+    if (sharedStack != null) {
+      InfrastructureState.save(journal, sharedStack, state);
+      return;
+    }
     Files.createDirectories(journal.getParent());
     Path temp = Files.createTempFile(journal.getParent(), "infra-", ".tmp");
     try {
@@ -125,9 +197,15 @@ public final class Infrastructure {
     var state = load();
     String image = state.outputs().get("image_arn");
     if (image != null) {
-      var current = vm.getMicrovmImage(r -> r.imageIdentifier(image));
-      if (current.latestActiveImageVersion() != null)
-        state.outputs().put("image_version", current.latestActiveImageVersion());
+      try {
+        var current = vm.getMicrovmImage(r -> r.imageIdentifier(image));
+        if (current.latestActiveImageVersion() != null)
+          state.outputs().put("image_version", current.latestActiveImageVersion());
+      } catch (ResourceNotFoundException e) {
+        state.outputs().remove("image_arn");
+        state.outputs().remove("image_version");
+        state.managed().remove("image");
+      }
     }
     save(state);
     return Map.copyOf(state.outputs());
@@ -135,6 +213,11 @@ public final class Infrastructure {
 
   public Map<String, String> up(Spec spec, boolean rebuild, Duration imageTimeout)
       throws Exception {
+    return up(spec, null, rebuild, imageTimeout);
+  }
+
+  public Map<String, String> up(
+      Spec spec, NetworkSpec network, boolean rebuild, Duration imageTimeout) throws Exception {
     var state = load();
     var out = state.outputs();
     if (out.containsKey("build_bucket") && !out.get("build_bucket").equals(spec.bucket()))
@@ -232,12 +315,55 @@ public final class Infrastructure {
         save(state);
       }
     }
+    CreateNetworkConnectorRequest connectorRequest = spec.newConnector();
+    if (network != null && !out.containsKey("egress_network_connector_arn")) {
+      if (ec2 == null)
+        throw new IllegalStateException("EC2 client required for network provisioning");
+      String vpc =
+          network.vpcId() == null || network.vpcId().isBlank()
+              ? Networking.defaultVpc(ec2)
+              : network.vpcId();
+      out.put("vpc_id", vpc);
+      String group = out.get("security_group_id");
+      if (group == null) {
+        group = network.securityGroupId();
+        if (group == null || group.isBlank()) {
+          group = Networking.createSecurityGroup(ec2, network.name(), vpc);
+          state.managed().add("security_group");
+        }
+        out.put("security_group_id", group);
+        save(state);
+      }
+      String operator = out.get("network_operator_role_arn");
+      if (operator == null) {
+        operator = network.operatorRoleArn();
+        if (operator == null || operator.isBlank()) {
+          String name = network.name() + "-operator";
+          var created = iam.createRole(Networking.operatorRole(name));
+          operator = created.role().arn();
+          out.put("network_operator_role_name", name);
+          state.managed().add("network_operator_role");
+          out.put("network_operator_role_arn", operator);
+          save(state);
+        } else {
+          out.put("network_operator_role_arn", operator);
+          save(state);
+        }
+      }
+      if (state.managed().contains("network_operator_role"))
+        Networking.grantOperatorPermissions(iam, out.get("network_operator_role_name"));
+      List<String> subnets = Networking.subnets(ec2, vpc, network.subnetIds());
+      out.put("subnet_ids", json.writeValueAsString(subnets));
+      connectorRequest = Networking.connector(network.name(), subnets, List.of(group), operator);
+      save(state);
+    }
     if (!out.containsKey("egress_network_connector_arn")) {
       if (spec.existingConnectorArn() != null)
         out.put("egress_network_connector_arn", spec.existingConnectorArn());
-      else if (spec.newConnector() != null) {
+      else if (connectorRequest != null) {
         out.put(
-            "egress_network_connector_arn", core.createNetworkConnector(spec.newConnector()).arn());
+            "egress_network_connector_arn",
+            Networking.createConnector(core, connectorRequest).arn());
         state.managed().add("connector");
       }
       save(state);
@@ -296,7 +422,10 @@ public final class Infrastructure {
     var out = state.outputs();
     if (state.managed().contains("connector")) {
       String arn = out.get("egress_network_connector_arn");
-      core.deleteNetworkConnector(r -> r.identifier(arn));
+      try {
+        core.deleteNetworkConnector(r -> r.identifier(arn));
+      } catch (software.amazon.awssdk.services.lambdacore.model.ResourceNotFoundException ignored) {
+      }
       long start = System.nanoTime();
       while (true) {
         try {
@@ -309,23 +438,46 @@ public final class Infrastructure {
         Thread.sleep(1000);
       }
       state.managed().remove("connector");
+      out.remove("egress_network_connector_arn");
+      save(state);
+    }
+    if (state.managed().contains("security_group")) {
+      if (ec2 == null) throw new IllegalStateException("EC2 client required for cleanup");
+      Networking.deleteSecurityGroup(ec2, out.get("security_group_id"), true);
+      state.managed().remove("security_group");
+      out.remove("security_group_id");
+      save(state);
+    }
+    if (state.managed().contains("network_operator_role")) {
+      Networking.deleteOperatorRole(iam, out.get("network_operator_role_name"), true);
+      state.managed().remove("network_operator_role");
+      out.remove("network_operator_role_name");
+      out.remove("network_operator_role_arn");
       save(state);
     }
     if (state.managed().contains("image")) {
       new Images(vm).remove(out.get("image_arn"), true);
       state.managed().remove("image");
+      out.remove("image_arn");
+      out.remove("image_version");
       save(state);
     }
     if (state.managed().contains("bucket")) {
       String bucket = out.get("build_bucket");
-      for (var page : s3.listObjectVersionsPaginator(r -> r.bucket(bucket))) {
-        for (var version : page.versions())
-          s3.deleteObject(r -> r.bucket(bucket).key(version.key()).versionId(version.versionId()));
-        for (var marker : page.deleteMarkers())
-          s3.deleteObject(r -> r.bucket(bucket).key(marker.key()).versionId(marker.versionId()));
+      try {
+        for (var page : s3.listObjectVersionsPaginator(r -> r.bucket(bucket))) {
+          for (var version : page.versions())
+            s3.deleteObject(
+                r -> r.bucket(bucket).key(version.key()).versionId(version.versionId()));
+          for (var marker : page.deleteMarkers())
+            s3.deleteObject(r -> r.bucket(bucket).key(marker.key()).versionId(marker.versionId()));
+        }
+        s3.deleteBucket(r -> r.bucket(bucket));
+      } catch (S3Exception e) {
+        if (e.statusCode() != 404) throw e;
       }
-      s3.deleteBucket(r -> r.bucket(bucket));
       state.managed().remove("bucket");
+      out.remove("build_bucket");
       save(state);
     }
     if (state.managed().contains("role")) {
@@ -335,12 +487,13 @@ public final class Infrastructure {
       } catch (software.amazon.awssdk.services.iam.model.NoSuchEntityException ignored) {
         // Provisioning may have failed before the inline policy was created.
       }
-      for (String policy : state.attachedPolicies())
-        iam.detachRolePolicy(r -> r.roleName(name).policyArn(policy));
-      iam.deleteRole(r -> r.roleName(name));
+      Networking.deleteRole(iam, name);
       state.managed().remove("role");
+      out.remove("role_name");
+      out.remove("execution_role_arn");
       save(state);
     }
-    Files.deleteIfExists(journal);
+    if (sharedStack != null) InfrastructureState.clear(journal, sharedStack);
+    else Files.deleteIfExists(journal);
   }
 }

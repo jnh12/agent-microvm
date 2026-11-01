@@ -2,10 +2,10 @@ name: Java SDK
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml']
   push:
     branches: [main, develop]
-    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox_mcp/tools/**', '.github/workflows/java.yml']
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml']
 permissions:
   contents: read
 jobs:
@@ -21,7 +21,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e ".[dev,mcp]"
+        working-directory: .
+      - run: python tests/python_contract.py
       - run: bash gradlew test build sdkDistribution
+      - run: python tests/python_contract.py --check-java
       - run: bash gradlew -p tests/consumer compileJava
       - uses: actions/upload-artifact@v4
         with:

@@ -18,14 +18,17 @@ final class WebSocketForward implements AutoCloseable {
   private final Supplier<String> token;
   private final InetSocketAddress httpAddress;
   private volatile boolean closed;
+  private final boolean verifyTls;
 
   WebSocketForward(
       URI endpoint,
       int remotePort,
       int localPort,
       Supplier<String> token,
-      InetSocketAddress httpAddress)
+      InetSocketAddress httpAddress,
+      boolean verifyTls)
       throws IOException {
+    this.verifyTls = verifyTls;
     this.endpoint = endpoint;
     this.remotePort = remotePort;
     this.token = token;
@@ -118,13 +121,14 @@ final class WebSocketForward implements AutoCloseable {
       if (tls) {
         Socket raw = socket;
         socket =
-            ((SSLSocketFactory) SSLSocketFactory.getDefault())
+            Tls.context(verifyTls)
+                .getSocketFactory()
                 .createSocket(raw, endpoint.getHost(), address.getPort(), true);
         track(socket);
         sockets.remove(raw);
         var secure = (SSLSocket) socket;
         var parameters = secure.getSSLParameters();
-        parameters.setEndpointIdentificationAlgorithm("HTTPS");
+        parameters.setEndpointIdentificationAlgorithm(verifyTls ? "HTTPS" : null);
         secure.setSSLParameters(parameters);
         secure.startHandshake();
       }

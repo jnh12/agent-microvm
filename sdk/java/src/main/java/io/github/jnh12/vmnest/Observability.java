@@ -41,28 +41,50 @@ public final class Observability {
               .max(Comparator.comparing(Datapoint::timestamp));
       out.put(
           name,
-          latest.isPresent() ? OptionalDouble.of(latest.get().average()) : OptionalDouble.empty());
+          latest.isPresent()
+              ? OptionalDouble.of(
+                  new java.math.BigDecimal(latest.get().average())
+                      .setScale(2, java.math.RoundingMode.HALF_EVEN)
+                      .doubleValue())
+              : OptionalDouble.empty());
     }
     return out;
   }
 
-  public Map<String, Map<String, OptionalDouble>> metricsAll(
-      Collection<String> ids, Duration lookback) {
-    var out = new LinkedHashMap<String, Map<String, OptionalDouble>>();
-    for (var id : ids) out.put(id, metrics(id, lookback));
+  public record MetricResult(Map<String, OptionalDouble> metrics, String error) {
+    public MetricResult {
+      metrics = Map.copyOf(metrics);
+    }
+  }
+
+  public record MetricSample(int sample, Instant at, Map<String, OptionalDouble> metrics) {
+    public MetricSample {
+      metrics = Map.copyOf(metrics);
+    }
+  }
+
+  public Map<String, MetricResult> metricsAll(Collection<String> ids, Duration lookback) {
+    var out = new LinkedHashMap<String, MetricResult>();
+    for (var id : ids) {
+      try {
+        out.put(id, new MetricResult(metrics(id, lookback), null));
+      } catch (RuntimeException e) {
+        out.put(id, new MetricResult(Map.of(), e.getMessage()));
+      }
+    }
     return out;
   }
 
-  public List<Map<String, OptionalDouble>> sampleMetrics(String id, int samples, Duration interval)
+  public List<MetricSample> sampleMetrics(String id, int samples, Duration interval)
       throws InterruptedException {
-    if (samples < 1 || samples > 60 || interval.isNegative())
-      throw new IllegalArgumentException("1–60 samples and nonnegative interval required");
-    var out = new ArrayList<Map<String, OptionalDouble>>();
-    for (int i = 0; i < samples; i++) {
-      if (i > 0) Thread.sleep(interval.toMillis());
-      out.add(metrics(id, Duration.ofMinutes(5)));
+    int count = Math.max(1, Math.min(60, samples));
+    var out = new ArrayList<MetricSample>();
+    for (int i = 0; i < count; i++) {
+      if (i > 0) Thread.sleep(Math.max(0, interval.toMillis()));
+      var data = metrics(id, Duration.ofMinutes(5));
+      out.add(new MetricSample(i, Instant.now(), data));
     }
-    return out;
+    return List.copyOf(out);
   }
 
   public List<FilteredLogEvent> readLogs(String group, int tail, Instant since, String contains) {

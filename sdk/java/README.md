@@ -84,8 +84,8 @@ The SDK exposes the 35 operations available through the MCP tools. `CoverageTest
 
 | Operation | Java API |
 |---|---|
-| `runtime_check`, `runtime_install` | `RuntimeConfig.check`, `installationHelp` |
-| `infra_outputs`, `infra_list` | `Infrastructure.outputs`, `list` |
+| `runtime_check`, `runtime_install` | `RuntimeConfig.diagnostics`, `check`, `installationHelp` |
+| `infra_outputs`, `infra_list` | `Infrastructure.outputs`, `listStacks` |
 | `sandbox_run`, `sandbox_create`, `sandbox_list`, `sandbox_status`, `sandbox_remove` | `SandboxRegistry.run`, `create`, `list`, `statusAll`, `remove` |
 | `sandbox_start`, `sandbox_stop`, `sandbox_inspect`, `sandbox_wait` | `Sandbox.start`, **`suspend`**, `inspect`, `waitFor` |
 | `sandbox_exec`, `sandbox_shell` | `Sandbox.exec`, `shell` |
@@ -94,12 +94,12 @@ The SDK exposes the 35 operations available through the MCP tools. `CoverageTest
 | `sandbox_logs_read`, `sandbox_logs_stream` | `Observability.readLogs`, `pollLogs` |
 | `sandbox_metrics`, `sandbox_metrics_all`, `sandbox_metrics_stream` | `Observability.metrics`, `metricsAll`, `sampleMetrics` |
 | `image_list`, `image_inspect`, `image_remove`, `image_prune` | `Images.list/managed`, `inspect`, `remove`, `prune` |
-| CLI image build, guest-source packaging | `Images.archive`, `extractBundledGuest`, `build`, `waitActive` |
+| CLI image build, guest-source packaging | `Images.archive`, `resolveGuestDirectory`, `extractBundledGuest`, `build`, `waitActive` |
 | HTTP / WebSocket forwarding | `Sandbox.forward` / `PortForward` |
 | Provisioner plan/up/rebuild/refresh/outputs/destroy | `Infrastructure` with typed `Spec` and an ownership journal |
 | VPC/subnet/security-group/operator-role helpers | `Networking` plus native AWS clients |
 
-This package provides a Java library; the CLI and MCP server are distributed with the Python package. Configuration uses Java records and AWS request builders, rather than YAML. Java's registry/journal formats are separate from Python's state files. MCP response envelopes and text truncation are presentation-layer concerns; Java returns typed objects/raw bytes. Infrastructure and network helpers cover the same resource operations but explicitly require ownership decisions when using existing resources.
+This package provides a Java library; the CLI and MCP server are distributed with the Python package. `InfraConfig` reads the same `sandbox.yaml` schema, including multiple documents and directories. The default sandbox registry and infrastructure stack store use Python-compatible JSON files; Java records and AWS builders are also available for programmatic configuration. MCP response envelopes and text truncation are presentation-layer concerns; Java returns typed objects/raw bytes. Infrastructure and network helpers cover the same resource operations but explicitly require ownership decisions when using existing resources.
 
 ## Files, logs, metrics, and previews
 
@@ -127,11 +127,23 @@ Use your configured image log group; it may differ from `/aws/lambda-microvms/<v
 
 ## Persistent computers and provisioning
 
-`SandboxRegistry` holds an OS file lock for its lifetime. Close it before reopening the same journal. It records a launched VM before readiness polling, so a timeout remains recoverable by name. A failed journal write attempts termination. Use one registry per AWS region/client and coordinate operations on each sandbox.
+`SandboxRegistry` holds an OS file lock for its lifetime. Close it before reopening the same journal. It records a launched VM before readiness polling, so a timeout remains recoverable by name. A failed journal write attempts termination. Stored regions route operations to the appropriate AWS region. Coordinate operations on each sandbox, and do not write the same state file concurrently from Python and Java. Python does not honor the Java file lock. For custom guest ports, configure the same `AGENT_SANDBOX_AGENT_PORT` in both runtimes; Python preserves Java's per-record port metadata but uses its configured agent port.
 
-`Infrastructure.Spec` accepts a reused role ARN **or** a native `CreateRoleRequest`, an explicitly reused/new bucket, a guest directory and `CreateMicrovmImageRequest`, and an optional reused/new connector. Specify base-image settings and lifecycle hooks on the image request. `Networking.operatorRole` creates a suitable Lambda trust request; `grantOperatorPermissions` grants ENI management permissions when provisioning a network operator role. Security groups and operator roles created separately through `Networking` remain caller-owned and must be explicitly deleted through its cleanup methods/native IAM APIs.
+`Infrastructure.Spec` accepts a reused role ARN **or** a native `CreateRoleRequest`, an explicitly reused/new bucket, a guest directory and `CreateMicrovmImageRequest`, and an optional reused/new connector. Omitted base images resolve to the newest AWS-managed base image; omitted lifecycle hooks use the same guest defaults as Python. `Networking.operatorRole` creates a suitable Lambda trust request; `grantOperatorPermissions` grants ENI management permissions when provisioning a network operator role. `Infrastructure.NetworkSpec` (or `network.egress` in YAML) provisions and journals the security group, operator role, subnets, and connector together. Helpers called directly through `Networking` remain caller-owned.
 
-The infrastructure journal records ownership incrementally. `destroy(true)` deletes only managed image/connector/bucket/role resources, including bucket versions; use dedicated buckets. Reused resources are preserved. Before creating a bucket, provisioning checks its existence: an existing bucket requires `reuseBucket=true`, and access/connection errors stop provisioning. Only a 404 permits creation. Use a unique bucket name and do not create that name concurrently elsewhere; S3 has no atomic create-if-absent guarantee in `us-east-1`. Keep a separate journal per stack. `Infrastructure.list` discovers journals in a directory. Provisioning is not transactional; keep the journal after failures and inspect/reconcile resources before retrying. Client regions must match the spec. IAM propagation can require a retry after creating a new role. No provisioning/destroy method is called by the live test.
+To use an existing Python setup and state (AWS clients must use `config.region()`):
+
+```java
+var config = InfraConfig.load(Path.of("sandbox.yaml"));
+var infrastructure = Infrastructure.forConfig(config, iam, s3, microvms, core, ec2, null);
+System.out.println(infrastructure.plan(config));
+var outputs = infrastructure.up(config, false, Duration.ofMinutes(15));
+// infrastructure.refresh(); infrastructure.destroy(true);
+```
+
+`InfraConfig.loadAll(List.of(Path.of("configs")), "dev")` loads multiple YAML files/documents with a stack override. `RuntimeConfig.fromEnvironment()` fills missing image, execution-role and connector settings from the configured stack's outputs.
+
+The infrastructure journal records ownership incrementally. `destroy(true)` deletes only managed image/connector/security-group/operator-role/bucket/execution-role resources, including bucket versions; use dedicated buckets. Reused resources are preserved. Before creating a bucket, provisioning checks its existence: an existing bucket requires `reuseBucket=true`, and access/connection errors stop provisioning. Only a 404 permits creation. Use a unique bucket name and do not create that name concurrently elsewhere; S3 has no atomic create-if-absent guarantee in `us-east-1`. `Infrastructure.forConfig` uses the shared `~/.agent_sandbox/infra-state.json` store, keyed by `project/stack`; `AGENT_SANDBOX_INFRA_STATE` overrides the path. `listStacks` reads all stacks. The lower-level constructor also supports an isolated per-stack journal. Provisioning is not transactional; keep the journal after failures and inspect/reconcile resources before retrying. Client regions must match the spec. Connector creation retries transient role-assumption failures for up to 120 seconds. VM launches retry transient not-found/throttling errors for up to 180 seconds with one idempotency token. No provisioning/destroy method is called by the live test.
 
 `Images.extractBundledGuest` unpacks the repository's guest source from the JAR into a new directory; all code retains the repository license. Image archives reject symlinks and omit `.git`, `.venv`, and Python caches. `build` streams the archive through a temporary file and S3; it requires build-bucket permissions. `waitActive(arn, expectedVersion, timeout)` avoids mistaking an old active version for a completed rebuild.
 
@@ -143,6 +155,8 @@ Run from `sdk/java/`:
 ./gradlew test build sdkDistribution  # publishes only to build/repository
 ./gradlew -p tests/consumer compileJava  # checks public API dependencies
 ```
+
+`python tests/python_contract.py` verifies the fixture against the installed Python package; after Java tests, `python tests/python_contract.py --check-java` verifies Python can read Java-written state. CI runs both checks whenever either SDK changes. The fixture also tracks every public Python `Sandbox`, `AgentClient`, and `ControlPlane` operation so an added Python method requires a reviewed Java mapping.
 
 Tests cover lifecycle, signing/serialization, token refresh limits, filesystem transport, host policy, log pagination, metrics, registry locking/persistence, archive contents, provisioning ownership/partial failure, and forwarding. The live test is skipped unless explicitly enabled:
 
@@ -158,9 +172,9 @@ This creates one disposable VM with a ten-minute maximum lifetime. It tests exec
 
 - Calls block; use Java virtual threads when integrating with concurrent applications. Sandbox handles are not thread-safe; coordinate lifecycle changes per VM.
 - The caller owns AWS clients. Closing a sandbox terminates the VM and closes its guest transport, but not the shared AWS client. `AgentClient.close` closes only internally created HTTP clients; injected clients remain caller-owned.
-- Use a stable client token to reconcile launch retries. A generated token only protects AWS retries within one create call. For durable workflows, call `control.aws().runMicrovm` yourself, persist the returned identifier immediately, then wait/attach. A failed readiness wait does not terminate the launched VM.
+- Use a stable client token to reconcile launch retries. A generated token protects retries within one create call. For durable workflows, call `control.aws().runMicrovm` yourself, persist the returned identifier immediately, then wait/attach. A failed readiness wait does not terminate the launched VM.
 - Configure AWS API timeouts on the client: an in-flight AWS call can exceed the polling deadline. Interrupted waits propagate interruption. Set the guest HTTP timeout above the process timeout.
-- Guest errors expose status, not potentially sensitive response bodies. Invalid base64 fails explicitly. TLS certificate verification stays enabled; inject an HTTP client into `AgentClient` for custom trust stores. AWS-backed Sandbox endpoints require HTTPS.
+- Guest errors expose status, not potentially sensitive response bodies. Invalid base64 fails explicitly. TLS certificate verification stays enabled by default. `sandbox.verifyTls(false)` and the `AgentClient` / `PortForward` boolean overloads match Python's explicit TLS opt-out; prefer injecting a trusted HTTP client into `AgentClient` for private CAs. AWS-backed Sandbox endpoints require HTTPS.
 - `stop()` and `close()` **terminate**, matching Python SDK semantics. The Python CLI's `stop` command instead suspends.
 - Default tests use local HTTP servers and fake AWS credentials. Only the explicitly enabled live test creates a VM. The guest API does not provide PTY/streamed execution, SSH/SFTP, or content snapshots.
-- Coordinate image pruning against concurrent launches. Host allowlists resolve symlinks, but callers must prevent concurrent replacement of host directories during transfers. Port forwarding binds loopback, supports ordinary HTTP (including h2c downgrade) and WebSocket upgrades, and limits ordinary HTTP request bodies to 16 MiB. WebSocket forwarding preserves application subprotocols and frames (including binary data, fragmentation, ping/pong, and close). AWS authentication/routing protocols are added only upstream; TLS certificates and hostnames are verified. Closing the forward disconnects active sessions.
+- Coordinate image pruning against concurrent launches. Host allowlists resolve symlinks, but callers must prevent concurrent replacement of host directories during transfers. Port forwarding binds loopback, supports ordinary HTTP (including h2c downgrade) and WebSocket upgrades, and limits ordinary HTTP request bodies to 16 MiB. WebSocket forwarding preserves application subprotocols and frames (including binary data, fragmentation, ping/pong, and close). AWS authentication/routing protocols are added only upstream; TLS certificates and hostnames are verified unless explicitly opted out. Closing the forward disconnects active sessions.

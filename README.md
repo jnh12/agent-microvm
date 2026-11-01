@@ -139,6 +139,10 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 
 ## Components
 
+**Java 21+:** [Native Java SDK](java/README.md) — Gradle library for the same
+MicroVM lifecycle and guest exec/file protocol, using the official AWS Java SDK.
+No external Python wrapper is required.
+
 | Component | Description |
 | --- | --- |
 | Runtime | AWS Lambda MicroVMs (managed Firecracker) via `boto3` `lambda-microvms` |

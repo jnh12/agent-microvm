@@ -9,20 +9,6 @@ import java.util.*;
 /** Interoperable project/stack state; callers coordinate provisioning of each stack. */
 final class InfrastructureState {
   private static final ObjectMapper JSON = new ObjectMapper();
-  private static final Map<String, String> NAMES =
-      Map.of(
-          "role",
-          "role",
-          "bucket",
-          "bucket",
-          "image",
-          "image",
-          "connector",
-          "network_connector",
-          "security_group",
-          "security_group",
-          "network_operator_role",
-          "network_operator_role");
   private static final Map<String, String> IDS =
       Map.of(
           "role",
@@ -38,6 +24,10 @@ final class InfrastructureState {
           "network_operator_role",
           "network_operator_role_name");
 
+  private static String resourceName(String name) {
+    return name.equals("connector") ? "network_connector" : name;
+  }
+
   static synchronized Infrastructure.State load(Path file, String stack) throws IOException {
     var raw = root(file).path("stacks").path(stack);
     var outputs = new LinkedHashMap<String, String>();
@@ -49,25 +39,23 @@ final class InfrastructureState {
                     e.getKey(),
                     e.getValue().isTextual() ? e.getValue().asText() : e.getValue().toString()));
     var managed = new HashSet<String>();
-    for (var entry : NAMES.entrySet()) {
-      var resource = raw.path("resources").path(entry.getValue());
+    for (String name : IDS.keySet()) {
+      var resource = raw.path("resources").path(resourceName(name));
       if (resource.isMissingNode()) continue;
-      if (resource.path("managed").asBoolean(true)) managed.add(entry.getKey());
-      outputs.put(IDS.get(entry.getKey()), resource.path("id").asText());
-      if (entry.getKey().equals("image") && resource.path("attrs").hasNonNull("version"))
+      if (resource.path("managed").asBoolean(true)) managed.add(name);
+      outputs.put(IDS.get(name), resource.path("id").asText());
+      if (name.equals("image") && resource.path("attrs").hasNonNull("version"))
         outputs.put("image_version", resource.path("attrs").path("version").asText());
-      if (entry.getKey().equals("role"))
+      if (name.equals("role"))
         outputs.put(
             "execution_role_arn",
             resource.path("attrs").path("arn").asText(outputs.get("execution_role_arn")));
-      if (entry.getKey().equals("network_operator_role"))
+      if (name.equals("network_operator_role"))
         outputs.put(
             "network_operator_role_arn",
             resource.path("attrs").path("arn").asText(outputs.get("network_operator_role_arn")));
     }
-    var policies = new ArrayList<String>();
-    raw.path("java_attached_policies").forEach(n -> policies.add(n.asText()));
-    return new Infrastructure.State(outputs, managed, policies);
+    return new Infrastructure.State(outputs, managed);
   }
 
   static synchronized void save(Path file, String stack, Infrastructure.State state)
@@ -75,13 +63,13 @@ final class InfrastructureState {
     ObjectNode root = root(file), stacks = root.withObject("stacks");
     ObjectNode value = stacks.withObject(stack);
     ObjectNode resources = value.withObject("resources");
-    for (var entry : NAMES.entrySet()) {
-      String name = entry.getKey(), id = state.outputs().get(IDS.get(name));
+    for (String name : IDS.keySet()) {
+      String id = state.outputs().get(IDS.get(name));
       if (id == null) {
-        resources.remove(entry.getValue());
+        resources.remove(resourceName(name));
         continue;
       }
-      ObjectNode resource = resources.withObject(entry.getValue());
+      ObjectNode resource = resources.withObject(resourceName(name));
       resource.put("id", id).put("managed", state.managed().contains(name));
       String kind =
           switch (name) {
@@ -105,7 +93,7 @@ final class InfrastructureState {
       else outputs.put(entry.getKey(), entry.getValue());
     }
     value.set("outputs", outputs);
-    value.set("java_attached_policies", JSON.valueToTree(state.attachedPolicies()));
+    value.remove("java_attached_policies");
     write(file, root);
   }
 
@@ -132,7 +120,7 @@ final class InfrastructureState {
     return (ObjectNode) root;
   }
 
-  private static void write(Path file, ObjectNode value) throws IOException {
+  static void write(Path file, Object value) throws IOException {
     Files.createDirectories(file.toAbsolutePath().getParent());
     Path temporary = Files.createTempFile(file.toAbsolutePath().getParent(), "infra-", ".tmp");
     try {

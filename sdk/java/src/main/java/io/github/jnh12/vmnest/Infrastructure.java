@@ -44,12 +44,11 @@ public final class Infrastructure {
     }
   }
 
-  public record State(
-      Map<String, String> outputs, Set<String> managed, List<String> attachedPolicies) {
+  @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"attachedPolicies"})
+  public record State(Map<String, String> outputs, Set<String> managed) {
     public State {
       outputs = new LinkedHashMap<>(outputs);
       managed = new HashSet<>(managed);
-      attachedPolicies = new ArrayList<>(attachedPolicies);
     }
   }
 
@@ -154,7 +153,7 @@ public final class Infrastructure {
     if (sharedStack != null) return InfrastructureState.load(journal, sharedStack);
     return Files.exists(journal)
         ? json.readValue(journal.toFile(), State.class)
-        : new State(Map.of(), Set.of(), List.of());
+        : new State(Map.of(), Set.of());
   }
 
   private void save(State state) throws IOException {
@@ -162,19 +161,7 @@ public final class Infrastructure {
       InfrastructureState.save(journal, sharedStack, state);
       return;
     }
-    Files.createDirectories(journal.getParent());
-    Path temp = Files.createTempFile(journal.getParent(), "infra-", ".tmp");
-    try {
-      json.writeValue(temp.toFile(), state);
-      try {
-        Files.move(
-            temp, journal, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-      } catch (AtomicMoveNotSupportedException e) {
-        Files.move(temp, journal, StandardCopyOption.REPLACE_EXISTING);
-      }
-    } finally {
-      Files.deleteIfExists(temp);
-    }
+    InfrastructureState.write(journal, state);
   }
 
   public Map<String, String> outputs() throws IOException {
@@ -311,8 +298,6 @@ public final class Infrastructure {
           r -> r.roleName(roleName).policyName("vmnest-build").policyDocument(document));
       for (String policy : spec.extraPolicyArns()) {
         iam.attachRolePolicy(r -> r.roleName(roleName).policyArn(policy));
-        if (!state.attachedPolicies().contains(policy)) state.attachedPolicies().add(policy);
-        save(state);
       }
     }
     CreateNetworkConnectorRequest connectorRequest = spec.newConnector();
@@ -482,11 +467,6 @@ public final class Infrastructure {
     }
     if (state.managed().contains("role")) {
       String name = out.get("role_name");
-      try {
-        iam.deleteRolePolicy(r -> r.roleName(name).policyName("vmnest-build"));
-      } catch (software.amazon.awssdk.services.iam.model.NoSuchEntityException ignored) {
-        // Provisioning may have failed before the inline policy was created.
-      }
       Networking.deleteRole(iam, name);
       state.managed().remove("role");
       out.remove("role_name");

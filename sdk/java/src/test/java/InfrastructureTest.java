@@ -69,15 +69,22 @@ class InfrastructureTest {
             null);
     assertEquals("reuse", infra.plan(spec).get("role"));
     assertEquals("1", infra.up(spec, false, Duration.ofSeconds(1)).get("image_version"));
+    // Journals from earlier PR builds remain readable after removing unused policy bookkeeping.
+    var json = new com.fasterxml.jackson.databind.ObjectMapper();
+    var journal = dir.resolve("state.json");
+    var oldState = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(journal.toFile());
+    oldState.putArray("attachedPolicies").add("unused-policy");
+    json.writeValue(journal.toFile(), oldState);
     assertEquals("existing-arn", infra.refresh().get("image_arn"));
+    assertFalse(json.readTree(journal.toFile()).has("attachedPolicies"));
     assertThrows(IllegalArgumentException.class, () -> infra.destroy(false));
     infra.destroy(true);
     assertEquals(List.of("headBucket"), calls);
   }
 
   @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
-  void partialFailureRetainsOwnershipAndDestroyOnlyOwnedResources(boolean policyAbsent)
+  @org.junit.jupiter.params.provider.ValueSource(ints = {0, 1, 2})
+  void partialFailureRetainsOwnershipAndDestroyOnlyOwnedResources(int policyState)
       throws Exception {
     var calls = new ArrayList<String>();
     var iam =
@@ -86,8 +93,10 @@ class InfrastructureTest {
             (p, m, a) -> {
               calls.add(m.getName());
               if (m.getName().equals("deleteRolePolicy")) {
-                if (policyAbsent)
-                  throw NoSuchEntityException.builder().message("Policy was never created").build();
+                if (policyState == 1)
+                  throw NoSuchEntityException.builder()
+                      .message("Policy disappeared after listing")
+                      .build();
                 throw IamException.builder().statusCode(403).message("Access denied").build();
               }
               if (m.getName().equals("listRolePoliciesPaginator"))
@@ -95,7 +104,9 @@ class InfrastructureTest {
                     (IamClient) p,
                     ListRolePoliciesRequest.builder().roleName("owned-role").build());
               if (m.getName().equals("listRolePolicies"))
-                return ListRolePoliciesResponse.builder().build();
+                return ListRolePoliciesResponse.builder()
+                    .policyNames(policyState == 0 ? List.of() : List.of("vmnest-build"))
+                    .build();
               if (m.getName().equals("listAttachedRolePoliciesPaginator"))
                 return new software.amazon.awssdk.services.iam.paginators
                     .ListAttachedRolePoliciesIterable(
@@ -121,10 +132,7 @@ class InfrastructureTest {
                 case "listObjectVersionsPaginator" ->
                     new ListObjectVersionsIterable(
                         (S3Client) p,
-                        ((java.util.function.Consumer<ListObjectVersionsRequest.Builder>) a[0])
-                                == null
-                            ? null
-                            : ListObjectVersionsRequest.builder().bucket("owned-bucket").build());
+                        ListObjectVersionsRequest.builder().bucket("owned-bucket").build());
                 case "listObjectVersions" -> ListObjectVersionsResponse.builder().build();
                 case "deleteBucket" -> DeleteBucketResponse.builder().build();
                 default -> throw new AssertionError(m.getName());
@@ -148,13 +156,14 @@ class InfrastructureTest {
     String saved = Files.readString(state);
     assertTrue(saved.contains("owned-role-arn"));
     assertTrue(saved.contains("owned-bucket"));
-    if (!policyAbsent) {
+    if (policyState == 2) {
       assertThrows(IamException.class, () -> infra.destroy(true));
       assertFalse(calls.contains("deleteRole"));
       assertTrue(Files.exists(state));
       return;
     }
     infra.destroy(true);
+    assertEquals(policyState == 1, calls.contains("deleteRolePolicy"));
     assertTrue(calls.indexOf("deleteBucket") < calls.indexOf("deleteRole"));
     assertFalse(Files.exists(state));
   }

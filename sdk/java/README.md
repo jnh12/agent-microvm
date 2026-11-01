@@ -60,23 +60,9 @@ try (var aws = LambdaMicrovmsClient.create()) {
 }
 ```
 
-## Lifecycle API
+`Sandbox` provides create/attach, identity and state, execution, file reads/writes, refresh/inspect, suspend/resume, and termination. `stop()` and `close()` terminate the VM, matching Python SDK semantics. `ExecResult` contains binary output, UTF-8 accessors, and success status. `AgentClient` handles guest HTTP and retries authentication once on a 401. Use `ControlPlane.waitUntilRunning` for bounded readiness polling.
 
-| Operation | Java API |
-|---|---|
-| Sandbox create, attach, identity, endpoint, state | `Sandbox.create`, `attach`, `name`, `microvmId`, `endpoint`, `state` |
-| exec (args/cwd/env/timeout), read_file, write_file | `exec`, `readFile`, `writeFile`; binary byte arrays |
-| refresh, inspect | `refresh`, `inspect` (typed AWS response) |
-| suspend, start/resume, stop/terminate/kill | Lifecycle methods |
-| Scoped lifecycle | `AutoCloseable`; close terminates |
-| AgentClient health, token refresh, port routing | `AgentClient`; refresh once on 401, including health |
-| ControlPlane run/get/list/suspend/resume/terminate | `control.aws()` typed AWS operations and paginators |
-| auth tokens, create/list/managed-list/delete images | `control.aws()` typed AWS operations |
-| wait_until_running | `waitUntilRunning` with timeout, interval, terminal-state checks |
-| IdlePolicy / creation options | AWS `RunMicrovmRequest` and `IdlePolicy` builders |
-| ExecResult | `ExecResult` with byte arrays, UTF-8 accessors, success |
-
-The AWS client additionally exposes image version/build/tag APIs, idempotency tokens, and shell tokens. Use its standard credential/region provider chain; the library never stores credentials. Image and role default to `AGENT_SANDBOX_IMAGE_ARN` and `AGENT_SANDBOX_EXECUTION_ROLE_ARN`. The default idle policy is 900/300 seconds with auto-resume. CPU/memory are image settings, not launch-time resizing options.
+`control.aws()` exposes typed AWS lifecycle, token, image, version, build, and tag operations and paginators. Use its standard credential/region provider chain; the library never stores credentials. The default idle policy is 900/300 seconds with auto-resume. CPU/memory are image settings, not launch-time resizing options.
 
 ## Operations
 
@@ -172,9 +158,9 @@ This creates one disposable VM with a ten-minute maximum lifetime. It tests exec
 
 - Calls block; use Java virtual threads when integrating with concurrent applications. Sandbox handles are not thread-safe; coordinate lifecycle changes per VM.
 - The caller owns AWS clients. Closing a sandbox terminates the VM and closes its guest transport, but not the shared AWS client. `AgentClient.close` closes only internally created HTTP clients; injected clients remain caller-owned.
-- Use a stable client token to reconcile launch retries. A generated token protects retries within one create call. For durable workflows, call `control.aws().runMicrovm` yourself, persist the returned identifier immediately, then wait/attach. A failed readiness wait does not terminate the launched VM.
+- Use a stable client token to reconcile launch retries. For durable workflows, call `control.aws().runMicrovm` yourself, persist the returned identifier immediately, then wait/attach. A failed readiness wait does not terminate the launched VM.
 - Configure AWS API timeouts on the client: an in-flight AWS call can exceed the polling deadline. Interrupted waits propagate interruption. Set the guest HTTP timeout above the process timeout.
 - Guest errors expose status, not potentially sensitive response bodies. Invalid base64 fails explicitly. TLS certificate verification stays enabled by default. `sandbox.verifyTls(false)` and the `AgentClient` / `PortForward` boolean overloads match Python's explicit TLS opt-out; prefer injecting a trusted HTTP client into `AgentClient` for private CAs. AWS-backed Sandbox endpoints require HTTPS.
-- `stop()` and `close()` **terminate**, matching Python SDK semantics. The Python CLI's `stop` command instead suspends.
+- The Python CLI's `stop` command suspends; the SDK's `stop()` terminates.
 - Default tests use local HTTP servers and fake AWS credentials. Only the explicitly enabled live test creates a VM. The guest API does not provide PTY/streamed execution, SSH/SFTP, or content snapshots.
 - Coordinate image pruning against concurrent launches. Host allowlists resolve symlinks, but callers must prevent concurrent replacement of host directories during transfers. Port forwarding binds loopback, supports ordinary HTTP (including h2c downgrade) and WebSocket upgrades, and limits ordinary HTTP request bodies to 16 MiB. WebSocket forwarding preserves application subprotocols and frames (including binary data, fragmentation, ping/pong, and close). AWS authentication/routing protocols are added only upstream; TLS certificates and hostnames are verified unless explicitly opted out. Closing the forward disconnects active sessions.

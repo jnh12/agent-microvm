@@ -95,7 +95,7 @@ The SDK exposes the 35 operations available through the MCP tools. `CoverageTest
 | `sandbox_metrics`, `sandbox_metrics_all`, `sandbox_metrics_stream` | `Observability.metrics`, `metricsAll`, `sampleMetrics` |
 | `image_list`, `image_inspect`, `image_remove`, `image_prune` | `Images.list/managed`, `inspect`, `remove`, `prune` |
 | CLI image build, guest-source packaging | `Images.archive`, `extractBundledGuest`, `build`, `waitActive` |
-| CLI port forwarding | `Sandbox.forward` / `PortForward` |
+| HTTP / WebSocket forwarding | `Sandbox.forward` / `PortForward` |
 | Provisioner plan/up/rebuild/refresh/outputs/destroy | `Infrastructure` with typed `Spec` and an ownership journal |
 | VPC/subnet/security-group/operator-role helpers | `Networking` plus native AWS clients |
 
@@ -112,6 +112,7 @@ files.copyToHost("project/hello.txt", Path.of("./transfer/hello.txt"));
 
 try (var preview = sandbox.forward(8000, 0)) {
     System.out.println("http://localhost:" + preview.localPort());
+    // HTTP and WebSocket connections use this same local port.
     // Keep this handle open while using the preview.
 }
 
@@ -130,7 +131,7 @@ Use your configured image log group; it may differ from `/aws/lambda-microvms/<v
 
 `Infrastructure.Spec` accepts a reused role ARN **or** a native `CreateRoleRequest`, an explicitly reused/new bucket, a guest directory and `CreateMicrovmImageRequest`, and an optional reused/new connector. Specify base-image settings and lifecycle hooks on the image request. `Networking.operatorRole` creates a suitable Lambda trust request; `grantOperatorPermissions` grants ENI management permissions when provisioning a network operator role. Security groups and operator roles created separately through `Networking` remain caller-owned and must be explicitly deleted through its cleanup methods/native IAM APIs.
 
-The infrastructure journal records ownership incrementally. `destroy(true)` deletes only managed image/connector/bucket/role resources, including bucket versions; use dedicated buckets. Reused resources are preserved. Keep a separate journal per stack. `Infrastructure.list` discovers journals in a directory. Provisioning is not transactional; keep the journal after failures and inspect/reconcile resources before retrying. Client regions must match the spec. IAM propagation can require a retry after creating a new role. No provisioning/destroy method is called by the live test.
+The infrastructure journal records ownership incrementally. `destroy(true)` deletes only managed image/connector/bucket/role resources, including bucket versions; use dedicated buckets. Reused resources are preserved. Before creating a bucket, provisioning checks its existence: an existing bucket requires `reuseBucket=true`, and access/connection errors stop provisioning. Only a 404 permits creation. Use a unique bucket name and do not create that name concurrently elsewhere; S3 has no atomic create-if-absent guarantee in `us-east-1`. Keep a separate journal per stack. `Infrastructure.list` discovers journals in a directory. Provisioning is not transactional; keep the journal after failures and inspect/reconcile resources before retrying. Client regions must match the spec. IAM propagation can require a retry after creating a new role. No provisioning/destroy method is called by the live test.
 
 `Images.extractBundledGuest` unpacks the repository's guest source from the JAR into a new directory; all code retains the repository license. Image archives reject symlinks and omit `.git`, `.venv`, and Python caches. `build` streams the archive through a temporary file and S3; it requires build-bucket permissions. `waitActive(arn, expectedVersion, timeout)` avoids mistaking an old active version for a completed rebuild.
 
@@ -151,7 +152,7 @@ AGENT_SANDBOX_IMAGE_ARN=... AGENT_SANDBOX_EXECUTION_ROLE_ARN=... \
 VMNEST_JAVA_LOG_GROUP=... ./gradlew test --tests LiveTest --rerun-tasks
 ```
 
-This creates one disposable VM with a ten-minute maximum lifetime. It tests execution, filesystem operations and binary host transfers, application forwarding, suspend/resume with preserved data, and CloudWatch access. It always attempts termination and verifies completion. `build/live-vm-id.txt` remains as a recovery record if cleanup fails. AWS usage charges apply. CloudWatch log reads are exercised when `VMNEST_JAVA_LOG_GROUP` is supplied. IAM/S3/network/image-build mutations are covered by local tests; the live test does not provision infrastructure.
+This creates one disposable VM with a ten-minute maximum lifetime. It tests execution, filesystem operations and binary host transfers, HTTP and WebSocket application forwarding (text/binary echo and application subprotocols), suspend/resume with preserved data, and CloudWatch access. It always attempts termination and verifies completion. `build/live-vm-id.txt` remains as a recovery record if cleanup fails. AWS usage charges apply. CloudWatch log reads are exercised when `VMNEST_JAVA_LOG_GROUP` is supplied. IAM/S3/network/image-build mutations are covered by local tests; the live test does not provision infrastructure.
 
 ## Operational behavior
 
@@ -162,4 +163,4 @@ This creates one disposable VM with a ten-minute maximum lifetime. It tests exec
 - Guest errors expose status, not potentially sensitive response bodies. Invalid base64 fails explicitly. TLS certificate verification stays enabled; inject an HTTP client into `AgentClient` for custom trust stores. AWS-backed Sandbox endpoints require HTTPS.
 - `stop()` and `close()` **terminate**, matching Python SDK semantics. The Python CLI's `stop` command instead suspends.
 - Default tests use local HTTP servers and fake AWS credentials. Only the explicitly enabled live test creates a VM. The guest API does not provide PTY/streamed execution, SSH/SFTP, or content snapshots.
-- Coordinate image pruning against concurrent launches. Host allowlists resolve symlinks, but callers must prevent concurrent replacement of host directories during transfers. Port forwarding binds loopback, supports ordinary HTTP (including h2c downgrade), rejects WebSocket upgrades, and limits request bodies to 16 MiB.
+- Coordinate image pruning against concurrent launches. Host allowlists resolve symlinks, but callers must prevent concurrent replacement of host directories during transfers. Port forwarding binds loopback, supports ordinary HTTP (including h2c downgrade) and WebSocket upgrades, and limits ordinary HTTP request bodies to 16 MiB. WebSocket forwarding preserves application subprotocols and frames (including binary data, fragmentation, ping/pong, and close). AWS authentication/routing protocols are added only upstream; TLS certificates and hostnames are verified. Closing the forward disconnects active sessions.

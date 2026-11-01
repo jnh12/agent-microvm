@@ -102,6 +102,7 @@ class InfrastructureTest {
             (p, m, a) -> {
               calls.add(m.getName());
               return switch (m.getName()) {
+                case "headBucket" -> throw S3Exception.builder().statusCode(404).build();
                 case "createBucket" -> CreateBucketResponse.builder().build();
                 case "putPublicAccessBlock" -> throw new IllegalStateException("injected failure");
                 case "listObjectVersionsPaginator" ->
@@ -143,6 +144,46 @@ class InfrastructureTest {
     infra.destroy(true);
     assertTrue(calls.indexOf("deleteBucket") < calls.indexOf("deleteRole"));
     assertFalse(Files.exists(state));
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(ints = {200, 403, 301, 500, -1})
+  void existingOrUnknownBucketIsNeverCreatedOrOwned(int status) throws Exception {
+    var calls = new ArrayList<String>();
+    var s3 =
+        ExtendedTest.fake(
+            S3Client.class,
+            (p, m, a) -> {
+              calls.add(m.getName());
+              if (m.getName().equals("headBucket")) {
+                if (status == 200) return HeadBucketResponse.builder().build();
+                if (status == -1)
+                  throw software.amazon.awssdk.core.exception.SdkClientException.create(
+                      "network failure");
+                throw S3Exception.builder().statusCode(status).build();
+              }
+              // Reproduce us-east-1: creation WOULD succeed even though the bucket already exists.
+              if (m.getName().equals("createBucket")) return CreateBucketResponse.builder().build();
+              throw new AssertionError("Existing bucket must never be mutated: " + m.getName());
+            });
+    Path journal = dir.resolve("protected.json");
+    var infra = new Infrastructure(null, s3, null, null, journal);
+    var spec =
+        new Infrastructure.Spec(
+            "us-east-1",
+            "reused-role",
+            null,
+            List.of(),
+            "unrelated-data",
+            false,
+            dir,
+            CreateMicrovmImageRequest.builder().name("image").build(),
+            null,
+            null);
+    assertThrows(RuntimeException.class, () -> infra.up(spec, false, Duration.ofSeconds(1)));
+    assertFalse(Files.exists(journal));
+    infra.destroy(true);
+    assertEquals(List.of("headBucket"), calls);
   }
 
   @Test

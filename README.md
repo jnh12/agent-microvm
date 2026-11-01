@@ -847,8 +847,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 ## Status / not yet implemented
 
-Volumes, PTY/interactive sessions, network policy / TLS-MITM, and streaming exec
-(HTTP/2 / WebSocket) are not yet implemented. See `sdk/agent_sandbox/` for
+Volumes, PTY/interactive exec sessions, network policy / TLS-MITM, and streaming
+exec are not yet implemented. HTTP and WebSocket application forwarding are
+supported; forwarding does not add interactive sessions to the guest exec API. See `sdk/agent_sandbox/` for
 extension points, and [Unsupported capabilities](#unsupported-capabilities) for how these surface (or don't) in
 the MCP server.
 

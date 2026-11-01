@@ -139,6 +139,18 @@ public final class Infrastructure {
     var out = state.outputs();
     if (out.containsKey("build_bucket") && !out.get("build_bucket").equals(spec.bucket()))
       throw new IllegalArgumentException("Use a separate journal for another bucket");
+    if (!out.containsKey("build_bucket") && !spec.reuseBucket()) {
+      // us-east-1 CreateBucket can succeed for an existing owned bucket. Never adopt it.
+      boolean absent = false;
+      try {
+        s3.headBucket(r -> r.bucket(spec.bucket()));
+      } catch (S3Exception e) {
+        if (e.statusCode() != 404) throw e;
+        absent = true;
+      }
+      if (!absent)
+        throw new IllegalArgumentException("Bucket already exists; specify reuseBucket=true");
+    }
     String role = out.get("execution_role_arn");
     if (role == null) {
       if (spec.existingRoleArn() != null) role = spec.existingRoleArn();

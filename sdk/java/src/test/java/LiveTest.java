@@ -90,8 +90,8 @@ class LiveTest {
                   null,
                   Duration.ofSeconds(10));
           assertTrue(start.success());
-          try (var forward = sandbox.forward(8765, 0)) {
-            var http = HttpClient.newHttpClient();
+          try (var forward = sandbox.forward(8765, 0);
+              var http = HttpClient.newHttpClient()) {
             HttpResponse<byte[]> response = null;
             for (int attempt = 0; attempt < 10; attempt++) {
               response =
@@ -106,6 +106,7 @@ class LiveTest {
             assertEquals(200, response.statusCode());
             assertArrayEquals(new byte[] {0, -1, 3}, response.body());
           }
+          verifyWebSocket(sandbox, guest);
           sandbox.suspend();
           assertEquals(
               "suspended",
@@ -158,6 +159,129 @@ class LiveTest {
           Files.deleteIfExists(recovery);
           System.out.println("Confirmed disposable VM terminated");
         }
+      }
+    }
+  }
+
+  private static void verifyWebSocket(Sandbox sandbox, String guest) throws Exception {
+    String app =
+        """
+import base64,hashlib,socketserver,struct
+class Echo(socketserver.StreamRequestHandler):
+    def handle(self):
+        self.rfile.readline()
+        headers = {}
+        while True:
+            line = self.rfile.readline()
+            if line == b'\\r\\n': break
+            if not line: return
+            key,value = line.decode().split(':',1)
+            headers[key.lower()] = value.strip()
+        key = headers['sec-websocket-key']
+        accept = base64.b64encode(hashlib.sha1((key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest()).decode()
+        response = 'HTTP/1.1 101 Switching Protocols\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\nSec-WebSocket-Accept: '+accept+'\\r\\nSec-WebSocket-Protocol: vmnest-test\\r\\n\\r\\n'
+        self.wfile.write(response.encode())
+        while True:
+            frame = self.rfile.read(2)
+            if len(frame) < 2: return
+            opcode = frame[0] & 15
+            length = frame[1] & 127
+            if length == 126: length = struct.unpack('!H', self.rfile.read(2))[0]
+            if length == 127: length = struct.unpack('!Q', self.rfile.read(8))[0]
+            mask = self.rfile.read(4) if frame[1] & 128 else None
+            data = self.rfile.read(length)
+            if mask: data = bytes(b ^ mask[i%4] for i,b in enumerate(data))
+            opcode = 10 if opcode == 9 else opcode
+            prefix = bytes([128 | opcode, len(data)]) if len(data)<126 else bytes([128 | opcode,126])+struct.pack('!H',len(data))
+            self.wfile.write(prefix+data)
+            if opcode == 8: return
+socketserver.ThreadingTCPServer(('0.0.0.0',8766), Echo).serve_forever()
+""";
+    sandbox.writeFile(
+        guest + "/ws_preview.py", app.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    var start =
+        sandbox.exec(
+            "python3",
+            List.of(
+                "-c",
+                "import"
+                    + " subprocess,sys;subprocess.Popen([sys.executable,sys.argv[1]+'/ws_preview.py'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)",
+                guest),
+            null,
+            null,
+            Duration.ofSeconds(10));
+    assertTrue(start.success());
+    var ready =
+        sandbox.exec(
+            "python3",
+            List.of(
+                "-c",
+                """
+                import socket,time
+                for attempt in range(20):
+                    try:
+                        with socket.create_connection(('127.0.0.1',8766), timeout=1):
+                            break
+                    except OSError:
+                        time.sleep(0.25)
+                else:
+                    raise RuntimeError('WebSocket server did not start')
+                """),
+            null,
+            null,
+            Duration.ofSeconds(10));
+    assertTrue(ready.success(), ready.stderrText());
+    try (var forward = sandbox.forward(8766, 0);
+        var http = HttpClient.newHttpClient()) {
+      var text = new java.util.concurrent.CompletableFuture<String>();
+      var binary = new java.util.concurrent.CompletableFuture<byte[]>();
+      var ws =
+          http.newWebSocketBuilder()
+              .subprotocols("vmnest-test")
+              .buildAsync(
+                  URI.create("ws://localhost:" + forward.localPort() + "/echo"),
+                  new WebSocket.Listener() {
+                    public void onOpen(WebSocket socket) {
+                      socket.request(1);
+                    }
+
+                    public java.util.concurrent.CompletionStage<?> onText(
+                        WebSocket socket, CharSequence data, boolean last) {
+                      text.complete(data.toString());
+                      socket.request(1);
+                      return null;
+                    }
+
+                    public java.util.concurrent.CompletionStage<?> onBinary(
+                        WebSocket socket, java.nio.ByteBuffer data, boolean last) {
+                      byte[] bytes = new byte[data.remaining()];
+                      data.get(bytes);
+                      binary.complete(bytes);
+                      socket.request(1);
+                      return null;
+                    }
+
+                    public void onError(WebSocket socket, Throwable error) {
+                      text.completeExceptionally(error);
+                      binary.completeExceptionally(error);
+                    }
+                  })
+              .get(30, java.util.concurrent.TimeUnit.SECONDS);
+      try {
+        assertEquals("vmnest-test", ws.getSubprotocol());
+        ws.sendText("websocket-live", true).get(10, java.util.concurrent.TimeUnit.SECONDS);
+        assertEquals("websocket-live", text.get(10, java.util.concurrent.TimeUnit.SECONDS));
+        ws.sendBinary(java.nio.ByteBuffer.wrap(new byte[] {0, -1, 42}), true)
+            .get(10, java.util.concurrent.TimeUnit.SECONDS);
+        assertArrayEquals(
+            new byte[] {0, -1, 42}, binary.get(10, java.util.concurrent.TimeUnit.SECONDS));
+        ws.sendClose(WebSocket.NORMAL_CLOSURE, "done")
+            .get(10, java.util.concurrent.TimeUnit.SECONDS);
+        System.out.println(
+            "PASS: live AWS WebSocket authentication, application subprotocol, text and binary"
+                + " echo");
+      } finally {
+        ws.abort();
       }
     }
   }

@@ -9,10 +9,11 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
 
-/** Loopback HTTP reverse proxy. WebSockets/upgrades are unsupported, as in the Python CLI. */
+/** Loopback HTTP and WebSocket reverse proxy. */
 public final class PortForward implements AutoCloseable {
   private final HttpServer server;
   private final HttpClient http;
+  private final WebSocketForward gateway;
   private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
   private static final Set<String> OMIT =
       Set.of(
@@ -42,13 +43,13 @@ public final class PortForward implements AutoCloseable {
             .connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER)
             .build();
-    server =
-        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), localPort), 0);
+    server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
     server.setExecutor(workers);
     server.createContext(
         "/",
         exchange -> {
           try {
+            exchange.getResponseHeaders().set("Connection", "close");
             String upgrade = exchange.getRequestHeaders().getFirst("Upgrade");
             if (upgrade != null && !upgrade.equalsIgnoreCase("h2c")) {
               exchange.sendResponseHeaders(501, -1);
@@ -119,14 +120,23 @@ public final class PortForward implements AutoCloseable {
           }
         });
     server.start();
+    try {
+      gateway = new WebSocketForward(endpoint, remotePort, localPort, token, server.getAddress());
+    } catch (IOException | RuntimeException e) {
+      server.stop(0);
+      workers.shutdownNow();
+      http.shutdownNow();
+      throw e;
+    }
   }
 
   public int localPort() {
-    return server.getAddress().getPort();
+    return gateway.localPort();
   }
 
   @Override
   public void close() {
+    gateway.close();
     server.stop(0);
     workers.shutdownNow();
     http.shutdownNow();

@@ -1,4 +1,8 @@
-plugins { id 'java-library'; id 'maven-publish' }
+plugins {
+ id 'java-library'
+ id 'maven-publish'
+ id 'com.vanniktech.maven.publish.base' version '0.35.0'
+}
 group = 'io.github.jnh12'
 version = providers.gradleProperty('sdkVersion').getOrElse('0.1.0-SNAPSHOT')
 repositories { mavenCentral() }
@@ -20,8 +24,47 @@ dependencies {
 }
 test { useJUnitPlatform(); testLogging { exceptionFormat = 'full'; showStandardStreams = true } }
 publishing {
- publications { mavenJava(MavenPublication) { from components.java } }
+ publications {
+  mavenJava(MavenPublication) {
+   from components.java
+   artifactId = 'vmnest-java'
+   pom {
+    name = 'VMNest Java SDK'
+    description = 'Java SDK for isolated AWS microVM sandboxes: lifecycle, execution, files, forwarding, and infrastructure.'
+    url = 'https://github.com/jnh12/agent-microvm'
+    licenses {
+     license {
+      name = 'The Apache License, Version 2.0'
+      url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+     }
+    }
+    developers {
+     developer {
+      id = 'jnh12'
+      name = 'jnh12'
+      url = 'https://github.com/jnh12'
+     }
+    }
+    scm {
+     connection = 'scm:git:https://github.com/jnh12/agent-microvm.git'
+     developerConnection = 'scm:git:ssh://git@github.com/jnh12/agent-microvm.git'
+     url = 'https://github.com/jnh12/agent-microvm'
+    }
+   }
+  }
+ }
  repositories { maven { name = 'verification'; url = layout.buildDirectory.dir('repository') } }
+}
+
+// Ordinary builds and local distributions never require publishing credentials.
+if (providers.gradleProperty('centralRelease').getOrElse('false').toBoolean()) {
+ if (!(version.toString() ==~ /\d+\.\d+\.\d+/)) {
+  throw new GradleException('Central releases require -PsdkVersion=X.Y.Z (no SNAPSHOT suffix).')
+ }
+ mavenPublishing {
+  publishToMavenCentral(false)
+  signAllPublications()
+ }
 }
 tasks.register('bundleGuest', Zip) {
  from('../../guest') { exclude '**/__pycache__/**', '**/*.pyc' }

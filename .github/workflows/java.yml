@@ -2,10 +2,10 @@ name: Java SDK
 on:
   workflow_dispatch:
   pull_request:
-    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml']
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml', '.github/workflows/java-release.yml']
   push:
     branches: [main, develop]
-    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml']
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml', '.github/workflows/java-release.yml']
 permissions:
   contents: read
 jobs:

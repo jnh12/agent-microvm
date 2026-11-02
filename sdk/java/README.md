@@ -31,7 +31,21 @@ maven { url = uri('/absolute/path/to/repository') }
 
 Keep `mavenCentral()` for dependencies. Maven consumers can use the extracted directory as a `file:///.../repository` repository with the same group, artifact, and version.
 
-`./gradlew sdkDistribution` builds the ZIP in `build/distributions`. CI downloads expire after 30 days. The SDK is not published to Maven Central. Public publishing requires a verified Central namespace, signing keys, and publishing credentials; after publication consumers can use `mavenCentral()` and the release version directly.
+`./gradlew sdkDistribution` builds the ZIP in `build/distributions`. CI downloads expire after 30 days.
+
+### Publishing a release
+
+The **Release Java SDK** workflow accepts a release version such as `0.1.0` and runs the Java tests, cross-language contract checks, distribution build, and separate consumer compilation before signing and uploading. Leave **publish** unchecked to validate an upload for manual publication in the Central Portal; check it to publish after validation. Once published, a version cannot be replaced.
+
+The repository secrets are `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD` (the Portal user-token pair), `MAVEN_SIGNING_KEY` (ASCII-armored private GPG key), and optionally `MAVEN_SIGNING_PASSWORD` for a protected key. The corresponding public key must be available on a supported public keyserver, and the Portal account must own `io.github.jnh12`. Never commit these credentials.
+
+For a local release, supply the credentials through `ORG_GRADLE_PROJECT_mavenCentralUsername`, `ORG_GRADLE_PROJECT_mavenCentralPassword`, `ORG_GRADLE_PROJECT_signingInMemoryKey`, and optionally `ORG_GRADLE_PROJECT_signingInMemoryKeyPassword`. Then run:
+
+```sh
+./gradlew --no-daemon publishToMavenCentral -PcentralRelease=true -PsdkVersion=0.1.0
+```
+
+Use `publishAndReleaseToMavenCentral` instead to publish automatically after validation. Central tasks are enabled only with `-PcentralRelease=true`; ordinary tests, builds, and local distribution tasks need no credentials. On PowerShell, quote property arguments, for example `'-PsdkVersion=0.1.0'`.
 
 ## Usage
 

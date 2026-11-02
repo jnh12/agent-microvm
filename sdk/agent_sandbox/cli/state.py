@@ -37,6 +37,7 @@ class StateStore:
     def __init__(self, path: Path | None = None) -> None:
         self._path = path or _default_path()
         self._records: dict[str, SandboxRecord] = {}
+        self._metadata: dict = {}
         self._load()
 
     def _load(self) -> None:
@@ -46,12 +47,13 @@ class StateStore:
             data = json.loads(self._path.read_text())
         except (json.JSONDecodeError, OSError):
             data = {}
+        self._metadata = {key: value for key, value in data.items() if key != "sandboxes"}
         for name, rec in data.get("sandboxes", {}).items():
             self._records[name] = SandboxRecord(**rec)
 
     def _flush(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"sandboxes": {name: asdict(rec) for name, rec in self._records.items()}}
+        payload = {**self._metadata, "sandboxes": {name: asdict(rec) for name, rec in self._records.items()}}
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, indent=2))
         tmp.replace(self._path)

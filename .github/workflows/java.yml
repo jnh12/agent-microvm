@@ -1,0 +1,40 @@
+name: Java SDK
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml', '.github/workflows/java-release.yml']
+  push:
+    branches: [main, develop]
+    paths: ['sdk/java/**', 'LICENSE', 'guest/**', 'sdk/agent_sandbox/**', 'sdk/agent_sandbox_mcp/**', 'pyproject.toml', '.github/workflows/java.yml', '.github/workflows/java-release.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk/java
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e ".[dev,mcp]"
+        working-directory: .
+      - run: python tests/python_contract.py
+      - run: bash gradlew test build sdkDistribution
+      - run: python tests/python_contract.py --check-java
+      - run: bash gradlew -p tests/consumer compileJava
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vmnest-java
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            sdk/java/build/libs/*.jar
+            sdk/java/build/distributions/*.zip

@@ -1,0 +1,9 @@
+plugins { id 'java' }
+repositories {
+    maven { url = uri('../../build/repository') }
+    mavenCentral()
+}
+dependencies {
+    implementation "io.github.jnh12:vmnest-java:${providers.gradleProperty('sdkVersion').getOrElse('0.1.0-SNAPSHOT')}"
+}
+tasks.withType(JavaCompile).configureEach { options.release = 21 }

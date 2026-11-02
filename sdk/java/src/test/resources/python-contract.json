@@ -1,0 +1,121 @@
+{
+  "public_api": {
+    "Sandbox": [
+      "attach",
+      "create",
+      "endpoint",
+      "exec",
+      "inspect",
+      "microvm_id",
+      "name",
+      "read_file",
+      "refresh",
+      "start",
+      "state",
+      "stop",
+      "suspend",
+      "terminate",
+      "write_file"
+    ],
+    "AgentClient": [
+      "aclose",
+      "exec",
+      "health",
+      "read_file",
+      "write_file"
+    ],
+    "ControlPlane": [
+      "create_auth_token",
+      "create_microvm_image",
+      "delete_microvm_image",
+      "get_microvm",
+      "list_managed_microvm_images",
+      "list_microvm_images",
+      "list_microvms",
+      "resume_microvm",
+      "run_microvm",
+      "suspend_microvm",
+      "terminate_microvm",
+      "wait_until_running"
+    ]
+  },
+  "config": {
+    "project": "agent-microvm",
+    "stack": "dev",
+    "region": "us-east-1",
+    "image": {
+      "name": "agent-sandbox-guest",
+      "guest_dir": "./guest",
+      "base_image_arn": "",
+      "base_image_version": ""
+    },
+    "role": {
+      "arn": "",
+      "name": "agent-sandbox-exec",
+      "extra_policy_arns": []
+    },
+    "bucket": {
+      "name": ""
+    },
+    "network": {
+      "egress": {
+        "connector_arn": "",
+        "name": "agent-sandbox-egress",
+        "vpc_id": "",
+        "subnet_ids": [],
+        "security_group_id": "",
+        "operator_role_arn": ""
+      }
+    },
+    "base_dir": "."
+  },
+  "hooks": {
+    "port": 9000,
+    "microvmImageHooks": {
+      "ready": "ENABLED",
+      "readyTimeoutInSeconds": 60,
+      "validate": "ENABLED",
+      "validateTimeoutInSeconds": 15
+    },
+    "microvmHooks": {
+      "run": "ENABLED",
+      "runTimeoutInSeconds": 5,
+      "resume": "ENABLED",
+      "resumeTimeoutInSeconds": 5,
+      "suspend": "ENABLED",
+      "suspendTimeoutInSeconds": 10,
+      "terminate": "ENABLED",
+      "terminateTimeoutInSeconds": 10
+    }
+  },
+  "idle": {
+    "maxIdleDurationSeconds": 900,
+    "suspendedDurationSeconds": 300,
+    "autoResumeEnabled": true
+  },
+  "states": {
+    "PENDING": "pending",
+    "STARTING": "pending",
+    "RUNNING": "running",
+    "SUSPENDING": "running",
+    "SUSPENDED": "suspended",
+    "RESUMING": "pending",
+    "TERMINATING": "stopped",
+    "TERMINATED": "stopped",
+    "FAILED": "failed",
+    "other": "unknown",
+    "running": "running",
+    "": "unknown"
+  },
+  "registry": {
+    "sandboxes": {
+      "python": {
+        "name": "python",
+        "microvm_id": "vm-python",
+        "endpoint": "example.com",
+        "image_arn": "image",
+        "region": "us-east-1"
+      }
+    }
+  }
+}

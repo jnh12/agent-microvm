@@ -1,0 +1,84 @@
+plugins {
+ id 'java-library'
+ id 'maven-publish'
+ id 'com.vanniktech.maven.publish.base' version '0.35.0'
+}
+group = 'io.github.jnh12'
+version = providers.gradleProperty('sdkVersion').getOrElse('0.1.0-SNAPSHOT')
+repositories { mavenCentral() }
+java { withSourcesJar(); withJavadocJar() }
+tasks.withType(JavaCompile).configureEach { options.release = 21 }
+dependencies {
+ api 'software.amazon.awssdk:lambdamicrovms:2.57.8'
+ api 'software.amazon.awssdk:cloudwatch:2.57.8'
+ api 'software.amazon.awssdk:cloudwatchlogs:2.57.8'
+ api 'software.amazon.awssdk:s3:2.57.8'
+ api 'software.amazon.awssdk:iam:2.57.8'
+ api 'software.amazon.awssdk:lambdacore:2.57.8'
+ api 'software.amazon.awssdk:ec2:2.57.8'
+ implementation 'software.amazon.awssdk:url-connection-client:2.57.8'
+ api 'com.fasterxml.jackson.core:jackson-databind:2.19.4'
+ implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.19.4'
+ testImplementation 'org.junit.jupiter:junit-jupiter:5.12.2'
+ testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+test { useJUnitPlatform(); testLogging { exceptionFormat = 'full'; showStandardStreams = true } }
+publishing {
+ publications {
+  mavenJava(MavenPublication) {
+   from components.java
+   artifactId = 'vmnest-java'
+   pom {
+    name = 'VMNest Java SDK'
+    description = 'Java SDK for isolated AWS microVM sandboxes: lifecycle, execution, files, forwarding, and infrastructure.'
+    url = 'https://github.com/jnh12/agent-microvm'
+    licenses {
+     license {
+      name = 'The Apache License, Version 2.0'
+      url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+     }
+    }
+    developers {
+     developer {
+      id = 'jnh12'
+      name = 'jnh12'
+      url = 'https://github.com/jnh12'
+     }
+    }
+    scm {
+     connection = 'scm:git:https://github.com/jnh12/agent-microvm.git'
+     developerConnection = 'scm:git:ssh://git@github.com/jnh12/agent-microvm.git'
+     url = 'https://github.com/jnh12/agent-microvm'
+    }
+   }
+  }
+ }
+ repositories { maven { name = 'verification'; url = layout.buildDirectory.dir('repository') } }
+}
+
+// Ordinary builds and local distributions never require publishing credentials.
+if (providers.gradleProperty('centralRelease').getOrElse('false').toBoolean()) {
+ if (!(version.toString() ==~ /\d+\.\d+\.\d+/)) {
+  throw new GradleException('Central releases require -PsdkVersion=X.Y.Z (no SNAPSHOT suffix).')
+ }
+ mavenPublishing {
+  publishToMavenCentral(false)
+  signAllPublications()
+ }
+}
+tasks.register('bundleGuest', Zip) {
+ from('../../guest') { exclude '**/__pycache__/**', '**/*.pyc' }
+ archiveFileName = 'vmnest-guest.zip'
+ destinationDirectory = layout.buildDirectory.dir('generated-guest')
+}
+tasks.named('processResources') { dependsOn 'bundleGuest'; from(tasks.named('bundleGuest')); from('../../LICENSE') { into 'META-INF' } }
+
+tasks.register('sdkDistribution', Zip) {
+    dependsOn 'publishMavenJavaPublicationToVerificationRepository'
+    archiveBaseName = 'vmnest-java'
+    archiveClassifier = 'maven-repository'
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from(layout.buildDirectory.dir('repository')) { into 'repository' }
+    from('README.md')
+    from('../../LICENSE')
+}

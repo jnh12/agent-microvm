@@ -6,20 +6,20 @@
 
 **Isolated AWS microVM sandboxes for AI agents.**
 
-Python SDK · CLI · MCP server · AWS microVMs
+SDK · CLI · MCP server · AWS microVMs
 
 [![GitHub stars](https://img.shields.io/github/stars/jnh12/agent-microvm?style=flat&color=f6c85f)](https://github.com/jnh12/agent-microvm/stargazers)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-71d6c5)](LICENSE)
 [![PyPI version](https://img.shields.io/pypi/v/vmnest?color=8bb8f8)](https://pypi.org/project/vmnest/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-8bb8f8)](https://www.python.org/downloads/)
 
-[Getting started](#1-install-the-sdkcli) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
+[Python setup](#1-install-the-sdkcli) · [Java setup](sdk/java/README.md#install-and-download) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 Easy, fast, isolated **microVM sandboxes** for untrusted workloads (AI agents,
 user code, CI jobs) using [**AWS Lambda MicroVMs**](https://aws.amazon.com/lambda/lambda-microvms/)
-and provisioned with **bare `boto3`** (no external IaC engine required).
+and provisioned through the AWS SDKs.
 
 Each sandbox is a Firecracker MicroVM with VM-level isolation, snapshot-based
 fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
@@ -60,10 +60,10 @@ a disposable tool:
   with memory and disk intact.
 - **Serverless economics** — pay for what you use; no idle VM fleet sitting
   between agent runs.
-- **Batteries included** — one `agent_sandbox` SDK + `vmnest` CLI, a per-sandbox
+- **Batteries included** — Python and Java SDKs, the `vmnest` CLI, a per-sandbox
   HTTPS endpoint, and a built-in **MCP server** so Claude, Cursor, Goose, and
   other agents can create, run, and manage sandboxes as native tools.
-- **No IaC engine** — infrastructure is provisioned with bare `boto3` and tracked
+- **No IaC engine** — infrastructure is provisioned through AWS SDKs and tracked
   in a local state file; nothing else to install or operate.
 
 ### Use cases
@@ -139,14 +139,23 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 
 ## Components
 
+Choose the SDK for your application. Both use AWS Lambda MicroVMs and the shared guest API.
+
+| SDK | Install and usage | Source |
+|---|---|---|
+| Python 3.11+ | [`pip install vmnest`](#1-install-the-sdkcli) | [`sdk/agent_sandbox`](sdk/agent_sandbox) |
+| Java 21+ | [Gradle, Maven, and downloads](sdk/java/README.md) | [`sdk/java`](sdk/java) |
+
+The `vmnest` CLI and MCP server are distributed with the Python package.
+
 | Component | Description |
 | --- | --- |
-| Runtime | AWS Lambda MicroVMs (managed Firecracker) via `boto3` `lambda-microvms` |
+| Runtime | AWS Lambda MicroVMs (managed Firecracker) via the AWS SDK for Python or Java |
 | Guest agent | `guest/agentd` — FastAPI **agentd** (exec/fs API on port 8080) plus a **lifecycle-hook** server (port 9000), run together via `agentd.serve` and baked into the MicroVM image |
-| SDK | `agent_sandbox.Sandbox.create(...)` |
-| Transport | `agent_sandbox.agent_client.AgentClient` (HTTPS + `X-aws-proxy-auth`) |
+| SDKs | Python: `agent_sandbox.Sandbox`; Java: `io.github.jnh12.vmnest.Sandbox` |
+| Transport | Both SDKs use HTTPS + `X-aws-proxy-auth` through their `AgentClient` |
 | CLI | `vmnest` |
-| Infrastructure | `vmnest infra` (bare `boto3` provisioner, `agent_sandbox.infra`) driven by `sandbox.yaml`; PyYAML ships in the base install |
+| Infrastructure | Python: `vmnest infra` / `agent_sandbox.infra`, configured through `sandbox.yaml`; Java: `Infrastructure` with the same `sandbox.yaml` schema or typed configuration |
 | MCP server | `agent_sandbox_mcp` (FastMCP server, optional `[mcp]` extra, launched with `vmnest mcp`) |
 
 ## Architecture
@@ -154,7 +163,7 @@ image, execution role, S3 build bucket, and optional network connectors with bar
 ```mermaid
 graph TD
     subgraph app [Your Application]
-        SDK["agent_sandbox SDK / vmnest CLI"]
+        SDK["Python SDK / Java SDK / vmnest CLI"]
     end
     subgraph aws [lambda-microvms control plane]
         CP["run / suspend / resume / terminate + auth token"]
@@ -163,7 +172,7 @@ graph TD
         AG["agentd: exec, fs.read, fs.write (:8080)"]
         HK["lifecycle hooks: ready / validate / run / resume / suspend / terminate (:9000)"]
     end
-    SDK -->|"boto3"| CP
+    SDK -->|"AWS SDK"| CP
     CP -->|"id + HTTPS URL"| SDK
     SDK -->|"HTTPS + X-aws-proxy-auth"| AG
     CP -->|"lifecycle hooks (platform-only)"| HK
@@ -171,8 +180,9 @@ graph TD
 
 ## Prerequisites
 
-- Python 3.11+, [`uv`](https://docs.astral.sh/uv/)
-- AWS CLI v2 recent enough to include `lambda-microvms`, with credentials configured
+- Python SDK / CLI / MCP: Python 3.11+ with `pip` or [`uv`](https://docs.astral.sh/uv/)
+- Java SDK: JDK 21+; the Gradle wrapper is included in `sdk/java/`
+- AWS credentials configured for your SDK; AWS CLI v2 is useful for CLI-based credential setup and diagnostics
 - Docker (only to test the guest image locally; the build itself happens in AWS)
 - A region where Lambda MicroVMs is available: `us-east-1`, `us-east-2`, `us-west-2`, `eu-west-1`, `ap-northeast-1`. Pick any of these via `region:` in `sandbox.yaml` or the standard `AWS_DEFAULT_REGION` / `AWS_REGION` environment variable.
 
@@ -180,6 +190,8 @@ No IaC engine or external CLI is required — `vmnest infra` provisions everythi
 with `boto3` (a core dependency) and tracks state in a local JSON file.
 
 ## 1. Install the SDK/CLI
+
+For Java, follow the [Java installation and download guide](sdk/java/README.md#install-and-download). The walkthrough below uses the Python package and `vmnest` CLI.
 
 The package is published on PyPI as **`vmnest`** (Python import: `agent_sandbox`; command: `vmnest`). Install with `pip`:
 
@@ -275,6 +287,8 @@ are left untouched. This file also holds the outputs (`image_arn`,
 `execution_role_arn`, `build_bucket`) that the SDK/CLI auto-wire from.
 
 ## 3. Use the SDK
+
+For Java code examples, see [Java SDK usage](sdk/java/README.md#usage). The examples here use Python.
 
 After `vmnest infra up`, the CLI auto-reads `image_arn`, `execution_role_arn`, and
 any network outputs from the stack. For the raw SDK you can either rely on that
@@ -405,6 +419,8 @@ vmnest forward app --remote-port 8000 --local-port 8000
 ```
 
 ## Environment variables
+
+This section describes Python SDK, CLI, and MCP configuration. Java uses AWS client configuration and `RuntimeConfig`; see [Java SDK usage](sdk/java/README.md#usage).
 
 The SDK and CLI are configured mainly through `sandbox.yaml` + `vmnest infra`
 outputs, so **most setups need no environment variables at all**. The two below
@@ -701,20 +717,32 @@ for the env values the MCP process must resolve independently:
 | `AGENT_SANDBOX_WORKDIR` | `/work` | Default working directory inside the VM |
 | `AGENT_SANDBOX_VERIFY_TLS` | `1` | Set `0` to skip TLS verification to the MicroVM endpoint (debug only) |
 
-### SDK Gaps
+<a id="sdk-gaps"></a>
 
-The server stays a thin adapter over the `agent_sandbox` SDK and only exposes
-what the AWS Lambda MicroVMs backend supports today. The following
-microsandbox-mcp capabilities are intentionally **not** implemented because the
-backend has no first-class API for them:
+### Unsupported capabilities
 
-- **Volumes** (`volume_*`) — no named-volume API.
-- **Snapshots** (`snapshot_*`) — only suspend/resume exist, not content snapshots.
-- **SSH / SFTP** (`sandbox_ssh_*`, `sandbox_sftp_*`) — no SSH subsystem in the guest.
+The MCP server is a thin adapter over the `agent_sandbox` SDK. These
+microsandbox-mcp operations are not implemented by this repository's MCP server,
+Python SDK, or Java SDK. The limitations come from a combination of the available
+AWS APIs and the current guest implementation:
+
+- **Volumes** (`volume_*`) — no named-volume management API in the SDKs or
+  [AWS Lambda MicroVMs API](https://docs.aws.amazon.com/lambda/latest/microvm-api/API_Operations.html).
+- **User-managed snapshots** (`snapshot_*`) — no API here to capture a running
+  sandbox as a named snapshot and restore or clone it later. AWS does use
+  [image-build snapshots](https://docs.aws.amazon.com/lambda/latest/dg/microvms-images-snapshots.html)
+  and preserves memory and disk during suspend/resume; those are distinct features.
+- **SSH / SFTP tools** (`sandbox_ssh_*`, `sandbox_sftp_*`) — no SSH/SFTP client
+  integration in the SDKs or MCP server, and the bundled guest does not configure
+  an SSH server. AWS separately supports
+  [interactive shell authentication](https://docs.aws.amazon.com/lambda/latest/microvm-api/API_CreateMicrovmShellAuthToken.html)
+  with `SHELL_INGRESS`; this is not an implementation of these MCP tools.
 - **Streaming exec sessions** (`sandbox_exec_start` / `_poll` / `_write_stdin` /
-  `_signal` / `_close`) and `sandbox_drain` — `agentd`'s `/v1/exec` is a blocking,
-  one-shot call, so interactive/streamed sessions are not possible without
-  guest-side changes.
+  `_signal` / `_close`) and `sandbox_drain` — `agentd`'s `/v1/exec` returns output
+  after a command completes or times out. It has no session handles, interactive
+  stdin, or incremental output API. Supporting these operations through `agentd`
+  requires guest and client changes. This does not preclude AWS's separate
+  interactive shell facility.
 
 ### MCP development
 
@@ -819,9 +847,10 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
 
 ## Status / not yet implemented
 
-Volumes, PTY/interactive sessions, network policy / TLS-MITM, and streaming exec
-(HTTP/2 / WebSocket) are not yet implemented. See `sdk/agent_sandbox/` for
-extension points, and [SDK Gaps](#sdk-gaps) for how these surface (or don't) in
+Volumes, PTY/interactive exec sessions, network policy / TLS-MITM, and streaming
+exec are not yet implemented. HTTP and WebSocket application forwarding are
+supported; forwarding does not add interactive sessions to the guest exec API. See `sdk/agent_sandbox/` for
+extension points, and [Unsupported capabilities](#unsupported-capabilities) for how these surface (or don't) in
 the MCP server.
 
 ## Contributing

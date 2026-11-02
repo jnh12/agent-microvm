@@ -4,6 +4,27 @@ Java 21+ SDK for AWS Lambda MicroVMs: lifecycle, execution, files, monitoring, i
 
 ## Install and download
 
+Add the released SDK from Maven Central to your Gradle application:
+
+```groovy
+repositories { mavenCentral() }
+dependencies {
+    implementation 'io.github.jnh12:vmnest-java:0.1.0'
+}
+```
+
+For Maven:
+
+```xml
+<dependency>
+  <groupId>io.github.jnh12</groupId>
+  <artifactId>vmnest-java</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+### Building a development version
+
 From a repository checkout:
 
 ```sh

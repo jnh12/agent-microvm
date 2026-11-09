@@ -76,6 +76,13 @@ editing a profile affects new agents, while an existing stopped agent can adopt
 it with `vmnest agent update AGENT_ID --file settings.json`, where the file
 contains `{"profile_id":"PROFILE_ID"}`.
 
+Workspace backups exclude symlinks that point outside `/workspace`. Create Python
+virtual environments with copied interpreters so they survive a stop:
+
+```sh
+python -m venv --copies /workspace/.venv
+```
+
 ## Webhooks
 
 ```sh

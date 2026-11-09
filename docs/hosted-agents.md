@@ -9,7 +9,7 @@ charges still apply.
 ## CLI
 
 ```sh
-pip install "vmnest[mcp]>=0.3.0"
+pip install -U vmnest
 vmnest login
 
 # Explicitly transfer only your existing Codex login credential.
@@ -44,10 +44,12 @@ vmnest profile create connected-work --provider codex --credential CREDENTIAL_ID
 ```
 
 An empty tool list denies every tool. `"*"` explicitly grants all tools in that
-connection. GitHub connections also require exact `owner/repository` entries and
-`--write` for write operations. Remote MCP connections use HTTPS and separately
-stored tokens or headers. Connection destinations and credentials are immutable;
-create a new connection to change them.
+connection. Token-based GitHub connections (`--kind github`) also require exact
+`owner/repository` entries and `--write` for write operations. Native GitHub app
+connections grant the selected tools within the connected provider account's
+access. Remote MCP connections use HTTPS and separately stored tokens or headers.
+Connection destinations and credentials are immutable; create a new connection
+to change them.
 
 ```sh
 vmnest connection create source --kind github --repository owner/repo \
@@ -66,8 +68,10 @@ vmnest run artifacts RUN_ID
 vmnest run download-url RUN_ID ARTIFACT_ID
 ```
 
-Stopping saves conversation and workspace files. Processes and RAM do not survive
-a stop. Idle agents stop automatically. A run uses a snapshot of its profile;
+Stopping saves conversation, workspace files, and project dependencies installed
+inside the workspace. Processes, RAM, and globally installed OS packages reset
+when the computer stops. Idle agents stop automatically. A run uses a snapshot
+of its profile;
 editing a profile affects new agents, while an existing stopped agent can adopt
 it with `vmnest agent update AGENT_ID --file settings.json`, where the file
 contains `{"profile_id":"PROFILE_ID"}`.
@@ -123,6 +127,12 @@ try (var cloud = HostedClient.fromEnvironment()) {
 
 Java uses `VMNEST_API_TOKEN`, created with `vmnest token create --name java`.
 The Java `Agents` methods mirror the Python operations, returning Jackson JSON.
+Install the optional MCP support only when connecting an MCP client:
+
+```sh
+pip install -U "vmnest[mcp]"
+```
+
 The hosted MCP catalog includes `agent_run`, `agent_message`, `agent_run_events`,
 `agent_run_cancel`, profile creation, durable agent controls, resource inspection,
 and artifact listing. Connect provider credentials explicitly through the CLI

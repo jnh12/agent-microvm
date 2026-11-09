@@ -26,7 +26,7 @@ fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 
 ## Demo
 
-**Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
+**Install, configure, provision** — `uv pip install vmnest`, the whole of
 `sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
 role and build bucket:
 
@@ -188,7 +188,7 @@ and Python/Java/MCP examples.
 Install the same package and authorize your account in the browser:
 
 ```sh
-pip install "vmnest[mcp]>=0.3.0"
+pip install -U vmnest
 vmnest login
 vmnest whoami
 vmnest pricing

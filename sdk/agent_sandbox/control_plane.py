@@ -253,8 +253,10 @@ class ControlPlane:
             if status == "RUNNING":
                 return last
             if status in {"FAILED", "TERMINATED"}:
+                reason = last.raw.get("error") or last.raw.get("stateReason")
                 raise ControlPlaneError(
                     f"MicroVM {microvm_id} entered terminal status {status}"
+                    + (f": {reason}" if reason else "")
                 )
             await asyncio.sleep(poll_interval)
         raise SandboxTimeoutError(

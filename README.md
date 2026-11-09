@@ -180,11 +180,15 @@ graph TD
 
 ## Hosted use
 
+Run Codex or Claude jobs and durable agents with the same package. See
+[hosted agents](docs/hosted-agents.md) for profiles, selected connections, webhooks,
+and Python/Java/MCP examples.
+
 [VMNest Cloud](https://vmnest.cc) runs the infrastructure in AWS `us-east-1`.
 Install the same package and authorize your account in the browser:
 
 ```sh
-pip install "vmnest[mcp]>=0.2.0"
+pip install "vmnest[mcp]>=0.3.0"
 vmnest login
 vmnest whoami
 vmnest pricing
@@ -232,11 +236,9 @@ CPU and memory come from the image, as in self-hosted mode; the SDK's `cpus`/`me
 do not resize a running image. Explicit `IdlePolicy` values are supported within the maximum
 lifetime; omitted policy uses the service default.
 
-The initial pilot tariff is **$1.08/running hour**, **$0.0036/suspended hour**, **$0.10 per
-requested launch/suspend/resume**. Check `vmnest pricing`
-for the current rates before use. Charges are recorded on your account with manual payments;
-this is an operator-approved pilot tariff, not a guarantee of AWS transfer-cost coverage.
-The service reserves the permitted lifetime against your account limit before launching.
+VMNest billing is disabled for this pilot. Operator activation, concurrency limits,
+and daily runtime allowances control usage. Your model provider's usage terms and
+charges still apply to agent runs.
 
 Self-hosted use remains available below. Set `VMNEST_MODE=self-hosted` to bypass a saved
 cloud login and use your own AWS credentials and infrastructure; unset it to return to hosted use.

@@ -47,6 +47,8 @@ public final class HostedClient implements AutoCloseable {
 
   public JsonNode account() { return request("GET", "/v1/me", null, null); }
 
+  public Agents agents() { return new Agents(this); }
+
   public Images images() { return new Images(control.aws()); }
 
   public Observability observability() {

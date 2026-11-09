@@ -9,7 +9,7 @@ Add the released SDK from Maven Central to your Gradle application:
 ```groovy
 repositories { mavenCentral() }
 dependencies {
-    implementation 'io.github.jnh12:vmnest-java:0.2.0'
+    implementation 'io.github.jnh12:vmnest-java:0.3.0'
 }
 ```
 
@@ -19,7 +19,7 @@ For Maven:
 <dependency>
   <groupId>io.github.jnh12</groupId>
   <artifactId>vmnest-java</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation 'io.github.jnh12:vmnest-java:0.2.0-SNAPSHOT'
+    implementation 'io.github.jnh12:vmnest-java:0.3.0-SNAPSHOT'
 }
 ```
 
@@ -75,8 +75,10 @@ Sign in with `vmnest login`, then create an automation credential with
 `vmnest token create --name java-app`. Store the output in the secret environment variable
 `VMNEST_API_TOKEN`; `VMNEST_API_URL` defaults to `https://vmnest.cc`.
 Java uses this explicit SDK credential rather than reading the CLI's protected login file.
-New accounts require admin activation. See `vmnest pricing` for running, suspended,
-lifecycle charges, and `vmnest billing` for your balance.
+New accounts require admin activation. The pilot uses daily runtime allowances;
+VMNest billing is disabled. Model-provider usage terms and charges still apply.
+Use `cloud.agents()` for profiles, prompt jobs, durable agents and webhooks;
+see the [agent examples](../../docs/hosted-agents.md#java-and-mcp).
 
 ```java
 import io.github.jnh12.vmnest.*;

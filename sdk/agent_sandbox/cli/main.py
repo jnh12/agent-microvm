@@ -22,6 +22,7 @@ from agent_sandbox.hosted import enabled as hosted_enabled
 from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
+from .agents import register as register_agents
 from .auth import register as register_auth
 from .state import SandboxRecord, StateStore
 
@@ -41,6 +42,7 @@ infra_app = typer.Typer(
 )
 app.add_typer(infra_app)
 register_auth(app)
+register_agents(app)
 
 console = Console()
 err_console = Console(stderr=True)

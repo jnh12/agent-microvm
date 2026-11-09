@@ -126,7 +126,7 @@ public final class Images {
         }
     var removed = new ArrayList<String>();
     for (var image : list())
-      if (!used.contains(image.imageArn())) {
+      if (!used.contains(image.imageArn()) && !"default".equals(image.imageArn())) {
         remove(image.imageArn(), true);
         removed.add(image.imageArn());
       }

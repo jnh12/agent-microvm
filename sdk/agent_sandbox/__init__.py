@@ -13,10 +13,12 @@ from agent_sandbox.errors import (
     SandboxTimeoutError,
 )
 from agent_sandbox.models import ExecResult, SandboxConfig, SandboxState
+from agent_sandbox.hosted import HostedClient
 from agent_sandbox.sandbox import Sandbox
 
 __all__ = [
     "Sandbox",
+    "HostedClient",
     "SandboxConfig",
     "SandboxState",
     "ExecResult",
@@ -26,4 +28,4 @@ __all__ = [
     "SandboxTimeoutError",
 ]
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"

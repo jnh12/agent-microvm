@@ -89,7 +89,7 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
             arn = _image_arn(item)
             if not arn:
                 continue
-            if arn in in_use:
+            if arn in in_use or arn == "default":
                 kept.append(arn)
             else:
                 await cp.delete_microvm_image(arn)

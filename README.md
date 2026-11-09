@@ -178,7 +178,74 @@ graph TD
     CP -->|"lifecycle hooks (platform-only)"| HK
 ```
 
-## Prerequisites
+## Hosted use
+
+[VMNest Cloud](https://vmnest.cc) runs the infrastructure in AWS `us-east-1`.
+Install the same package and authorize your account in the browser:
+
+```sh
+pip install "vmnest[mcp]>=0.2.0"
+vmnest login
+vmnest whoami
+vmnest pricing
+vmnest create app --duration 3600
+vmnest exec app -- python -c 'print("hello")'
+vmnest forward app -r 8000 -l 8000
+vmnest stop app
+vmnest start app
+vmnest rm app
+vmnest billing
+```
+
+New accounts require admin activation before launching. Hosted names and inventory belong to
+your account and are shared across computers. `vmnest login --no-browser` prints the authorization
+page for remote terminals; `vmnest logout` revokes the saved credential. Credentials are protected
+with Windows DPAPI or a user-only file on other systems. `VMNEST_CONFIG` overrides its path.
+
+Python uses the saved login or `VMNEST_API_TOKEN`, without AWS credentials:
+
+```python
+import asyncio
+from agent_sandbox import Sandbox
+
+async def main():
+    async with await Sandbox.create("python-example", duration=3600) as sandbox:
+        result = await sandbox.exec("python", ["-c", "print('hello')"])
+        print(result.stdout_text)
+
+asyncio.run(main())
+```
+
+MCP uses the same account: run `vmnest mcp` after login. Lifecycle, files, execution, logs,
+metrics and image tools use the hosted API. For CI, Java, or another agent, create a separate
+credential with `vmnest token create --name my-agent` and store its output as the secret
+`VMNEST_API_TOKEN`. Do not put it in source control. `VMNEST_API_URL` changes the API origin;
+a saved credential is never reused for a different origin. See the [Java hosted example](sdk/java/README.md#hosted-use).
+CLI and automation tokens expire after 30 days; sign in or issue a replacement before expiry.
+
+Hosted CPU/memory metrics are current guest-reported diagnostic samples. They are not billing
+measurements or historical CloudWatch metrics.
+
+Build custom guest images with `vmnest image build ./guest --name my-image` and use the returned
+image ID with `vmnest create app --image IMAGE_ID` once `vmnest image ls` shows `ACTIVE`.
+The SDK equivalent is `HostedClient().build_image("my-image", "./guest")`, followed by
+`wait_for_image(image_id)`. Include the guest agent and lifecycle hooks in custom images.
+Images have immutable IDs; AWS roles, buckets and network connectors are managed by the service.
+CPU and memory come from the image, as in self-hosted mode; the SDK's `cpus`/`memory` arguments
+do not resize a running image. Explicit `IdlePolicy` values are supported within the maximum
+lifetime; omitted policy uses the service default.
+
+The initial pilot tariff is **$1.08/running hour**, **$0.0036/suspended hour**, **$0.10 per
+requested launch/suspend/resume**, and **$1 per custom image build**. Check `vmnest pricing`
+for the current rates before use. Charges are recorded on your account with manual payments;
+this is an operator-approved pilot tariff, not a guarantee of AWS transfer-cost coverage.
+The service reserves the permitted lifetime against your account limit before launching.
+
+Self-hosted use remains available below. Set `VMNEST_MODE=self-hosted` to bypass a saved
+cloud login and use your own AWS credentials and infrastructure; unset it to return to hosted use.
+Without a saved login or hosted environment variables, the existing self-hosted behavior is unchanged.
+
+## Prerequisites (self-hosted)
 
 - Python SDK / CLI / MCP: Python 3.11+ with `pip` or [`uv`](https://docs.astral.sh/uv/)
 - Java SDK: JDK 21+; the Gradle wrapper is included in `sdk/java/`

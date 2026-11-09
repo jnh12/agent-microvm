@@ -80,6 +80,14 @@ public record RuntimeConfig(
       String error) {}
 
   public Diagnostics diagnostics(ControlPlane control) {
+    if (control != null && control.hosted != null) {
+      try {
+        control.hosted.account();
+        return new Diagnostics("us-east-1", false, false, "default", null, true, null);
+      } catch (RuntimeException e) {
+        return new Diagnostics("us-east-1", false, false, "default", null, false, e.getMessage());
+      }
+    }
     boolean credentials = false;
     String error = null;
     try {
@@ -107,6 +115,7 @@ public record RuntimeConfig(
   }
 
   public boolean check(ControlPlane control) {
+    if (control.hosted != null) { control.hosted.account(); return true; }
     request("check");
     control.aws().getMicrovmImage(r -> r.imageIdentifier(imageArn));
     return true;

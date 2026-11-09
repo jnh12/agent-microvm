@@ -50,11 +50,13 @@ public final class SandboxRegistry implements AutoCloseable {
   }
 
   private String region() {
+    if (control.hosted != null) return "us-east-1";
     var config = control.aws().serviceClientConfiguration();
     return config == null || config.region() == null ? null : config.region().id();
   }
 
   private ControlPlane forEntry(Entry entry) {
+    if (control.hosted != null) return control;
     if (entry.region() == null || entry.region().equals(region())) return control;
     if (regionResolver != null) return regionResolver.apply(entry.region());
     return regional.computeIfAbsent(
@@ -76,6 +78,11 @@ public final class SandboxRegistry implements AutoCloseable {
   public SandboxRegistry(Path file, ControlPlane control) throws IOException {
     this.file = file.toAbsolutePath();
     this.control = control;
+    if (control.hosted != null) {
+      lockChannel = null;
+      fileLock = null;
+      return;
+    }
     Files.createDirectories(this.file.getParent());
     lockChannel =
         FileChannel.open(
@@ -94,11 +101,21 @@ public final class SandboxRegistry implements AutoCloseable {
   @Override
   public void close() throws IOException {
     regional.values().forEach(cp -> cp.aws().close());
-    fileLock.release();
-    lockChannel.close();
+    if (fileLock != null) fileLock.release();
+    if (lockChannel != null) lockChannel.close();
   }
 
   private Map<String, Entry> load() throws IOException {
+    if (control.hosted != null) {
+      var entries = new TreeMap<String, Entry>();
+      for (var item : control.hosted.sandboxes()) {
+        if ("terminated".equals(item.path("state").asText())) continue;
+        String name = item.path("name").asText();
+        entries.put(name, new Entry(name, item.path("id").asText(), Ports.agent(),
+            item.path("endpoint").asText(null), item.path("image").asText("default"), "us-east-1"));
+      }
+      return entries;
+    }
     if (!Files.exists(file)) return new TreeMap<>();
     var map = new TreeMap<String, Entry>();
     var root = json.readTree(file.toFile());
@@ -124,6 +141,7 @@ public final class SandboxRegistry implements AutoCloseable {
   }
 
   private void save(Map<String, Entry> entries) throws IOException {
+    if (control.hosted != null) return;
     Files.createDirectories(file.getParent());
     Path tmp = Files.createTempFile(file.getParent(), "registry-", ".tmp");
     try {
@@ -186,6 +204,12 @@ public final class SandboxRegistry implements AutoCloseable {
   }
 
   public synchronized void attach(String name, String id, int port) throws IOException {
+    if (control.hosted != null) {
+      var entry = load().get(name);
+      if (entry == null || !entry.microvmId().equals(id))
+        throw new IllegalArgumentException("Use the sandbox's hosted name; aliases are local-only");
+      return;
+    }
     var entries = load();
     if (entries.containsKey(name)) throw new IllegalArgumentException("Duplicate name");
     if (name == null
@@ -215,7 +239,7 @@ public final class SandboxRegistry implements AutoCloseable {
     if (entries.containsKey(name)) throw new IllegalArgumentException("Duplicate name");
     var b = request.toBuilder();
     if (request.clientToken() == null) b.clientToken(UUID.randomUUID().toString());
-    String id = control.runMicrovm(b.build()).microvmId();
+    String id = control.runMicrovm(b.build(), name).microvmId();
     entries.put(name, new Entry(name, id, port, null, request.imageIdentifier(), region()));
     try {
       save(entries);

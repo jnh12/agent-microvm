@@ -13,6 +13,7 @@ from agent_sandbox import Sandbox
 from agent_sandbox.cli.state import SandboxRecord, StateStore
 from agent_sandbox.control_plane import ControlPlane
 from agent_sandbox.errors import SandboxError
+from agent_sandbox.hosted import enabled as hosted_enabled
 
 from agent_sandbox_mcp.config import Config
 
@@ -26,6 +27,8 @@ def resolve_egress_connectors(
     pulls the connector configured via env / ``vmnest infra`` outputs. Returns
     ``None`` when no connector should be attached (the default).
     """
+    if hosted_enabled() and (egress_connector or use_infra):
+        raise SandboxError("AWS network connectors are only available in self-hosted mode")
     if egress_connector:
         return [egress_connector]
     if use_infra:
@@ -103,7 +106,11 @@ class SandboxRegistry:
             )
         return resolved
 
-    def _resolve_role(self, role: str | None) -> str:
+    def _resolve_role(self, role: str | None) -> str | None:
+        if hosted_enabled():
+            if role:
+                raise SandboxError("AWS roles are only available in self-hosted mode")
+            return None
         resolved = role or self._config.role_arn()
         if not resolved:
             raise SandboxError(

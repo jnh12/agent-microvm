@@ -9,7 +9,7 @@ Add the released SDK from Maven Central to your Gradle application:
 ```groovy
 repositories { mavenCentral() }
 dependencies {
-    implementation 'io.github.jnh12:vmnest-java:0.1.0'
+    implementation 'io.github.jnh12:vmnest-java:0.2.0'
 }
 ```
 
@@ -19,7 +19,7 @@ For Maven:
 <dependency>
   <groupId>io.github.jnh12</groupId>
   <artifactId>vmnest-java</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation 'io.github.jnh12:vmnest-java:0.1.0-SNAPSHOT'
+    implementation 'io.github.jnh12:vmnest-java:0.2.0-SNAPSHOT'
 }
 ```
 
@@ -68,7 +68,47 @@ For a local release, supply the credentials through `ORG_GRADLE_PROJECT_mavenCen
 
 Use `publishAndReleaseToMavenCentral` instead to publish automatically after validation. Central tasks are enabled only with `-PcentralRelease=true`; ordinary tests, builds, and local distribution tasks need no credentials. On PowerShell, quote property arguments, for example `'-PsdkVersion=0.1.0'`.
 
-## Usage
+## Hosted use
+
+Use the same SDK with [VMNest Cloud](https://vmnest.cc), without AWS credentials.
+Sign in with `vmnest login`, then create an automation credential with
+`vmnest token create --name java-app`. Store the output in the secret environment variable
+`VMNEST_API_TOKEN`; `VMNEST_API_URL` defaults to `https://vmnest.cc`.
+Java uses this explicit SDK credential rather than reading the CLI's protected login file.
+New accounts require admin activation. See `vmnest pricing` for running, suspended,
+lifecycle and custom-image-build charges, and `vmnest billing` for your balance.
+
+```java
+import io.github.jnh12.vmnest.*;
+import java.time.Duration;
+import java.util.List;
+
+try (var cloud = HostedClient.fromEnvironment();
+     var sandbox = cloud.create("java-example")) {
+    var result = sandbox.exec("python", List.of("-c", "print('hello')"),
+        null, null, Duration.ofSeconds(30));
+    System.out.println(result.stdoutText());
+    sandbox.writeFile("/work/hello.txt", "hello".getBytes());
+    sandbox.suspend();
+    sandbox.resume();
+}
+```
+
+Existing `Sandbox`, `SandboxFiles` and HTTP/WebSocket forwarding methods work unchanged.
+For custom image IDs, duration or idle policy, pass an AWS-shaped `RunMicrovmRequest` to
+`Sandbox.create` with `cloud.controlPlane()`; the hosted transport validates and converts
+it to the public API. AWS roles, networking and image-version overrides are self-hosted options.
+`SandboxRegistry(cloud.controlPlane())` resolves account-owned names on the server and does
+not read or overwrite your local self-hosted state.
+
+Use `cloud.images()` for list/inspect/remove/prune and `cloud.observability()` for logs and
+metrics. Hosted metrics are current guest-reported samples, not billing or historical data.
+`cloud.buildImage(name, directory)` uploads a guest directory and queues a build;
+`cloud.waitForImage(imageId, Duration.ofMinutes(15))` waits for it to become active.
+Custom guest directories must include the guest agent and lifecycle hooks. Infrastructure
+provisioning remains an operator/self-hosted operation.
+
+## Usage (self-hosted)
 
 Configure AWS credentials and `AWS_REGION` for the AWS client. Set `AGENT_SANDBOX_IMAGE_ARN` and `AGENT_SANDBOX_EXECUTION_ROLE_ARN` to your image and execution role. The example below runs inside a Java method that declares `throws Exception`.
 

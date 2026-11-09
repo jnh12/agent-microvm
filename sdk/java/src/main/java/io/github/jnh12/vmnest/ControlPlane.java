@@ -8,9 +8,19 @@ import software.amazon.awssdk.services.lambdamicrovms.model.*;
 /** AWS's typed client exposes all lifecycle, image, token and pagination operations. */
 public final class ControlPlane {
   private final LambdaMicrovmsClient aws;
+  final HostedClient hosted;
 
   public ControlPlane(LambdaMicrovmsClient aws) {
+    this(aws, null);
+  }
+
+  ControlPlane(LambdaMicrovmsClient aws, HostedClient hosted) {
     this.aws = aws;
+    this.hosted = hosted;
+  }
+
+  RunMicrovmResponse runMicrovm(RunMicrovmRequest request, String name) throws InterruptedException {
+    return hosted == null ? runMicrovm(request) : hosted.launch(name, request);
   }
 
   /** Caller owns this client and closes it after all sandboxes are finished. */

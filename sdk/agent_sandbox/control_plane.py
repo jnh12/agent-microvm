@@ -83,6 +83,13 @@ class ControlPlane:
         if client is not None:
             self._client = client
         else:
+            from agent_sandbox.hosted import HostedClient, enabled
+
+            if enabled():
+                if region not in (None, "us-east-1"):
+                    raise ControlPlaneError("VMNest Cloud runs in us-east-1")
+                self._client = HostedClient()
+                return
             try:
                 self._client = boto3.client(_SERVICE, region_name=region)
             except Exception as exc:  # noqa: BLE001 - surface as ControlPlaneError
@@ -155,11 +162,16 @@ class ControlPlane:
         ingress_network_connectors: list[str] | None = None,
         egress_network_connectors: list[str] | None = None,
         maximum_duration_seconds: int | None = None,
+        name: str | None = None,
     ) -> MicroVMInfo:
         # CPU/memory are image-level (set at image build via cpuConfigurations /
         # resources), not run-time. Networking uses network *connectors*, not
         # subnets/security groups. Only valid RunMicrovm params are sent.
         kwargs: dict[str, Any] = {"imageIdentifier": image_arn}
+        from agent_sandbox.hosted import HostedClient
+
+        if isinstance(self._client, HostedClient):
+            kwargs["name"] = name
         if execution_role_arn:
             kwargs["executionRoleArn"] = execution_role_arn
         if idle_policy:

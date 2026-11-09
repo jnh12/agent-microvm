@@ -69,7 +69,7 @@ class HostedTest {
         assertEquals(1, cloud.images().managed().size());
         assertEquals("default", cloud.images().inspect("default").imageArn());
         assertEquals("default", cloud.images().waitActive("default", Duration.ofSeconds(3)).imageArn());
-        assertTrue(cloud.images().prune(true).isEmpty());
+        assertThrows(UnsupportedOperationException.class, () -> cloud.images().prune(true));
         var metrics = cloud.observability().metrics("sandbox-one", Duration.ofMinutes(30));
         assertEquals(4.5, metrics.get("CPUUtilization").getAsDouble());
         assertTrue(metrics.get("MemoryUtilization").isEmpty());
@@ -88,5 +88,27 @@ class HostedTest {
     assertThrows(IllegalArgumentException.class, () -> new HostedClient(URI.create("http://remote.example"), "secret"));
     assertThrows(IllegalArgumentException.class, () -> new HostedClient(URI.create("https://user:pass@example.com"), "secret"));
     assertThrows(IllegalArgumentException.class, () -> new HostedClient(URI.create("https://example.com"), ""));
+  }
+
+  @Test void customImagesFailBeforeFilesystemOrNetwork() throws Exception {
+    try (var cloud = new HostedClient(URI.create("http://127.0.0.1:9"), "test-token")) {
+      assertThrows(UnsupportedOperationException.class,
+          () -> cloud.buildImage("custom", temporary.resolve("missing")));
+      assertThrows(UnsupportedOperationException.class,
+          () -> cloud.images().build(temporary.resolve("missing"), null, "bucket", "key", null));
+      assertThrows(UnsupportedOperationException.class,
+          () -> cloud.controlPlane().aws().createMicrovmImage(
+              software.amazon.awssdk.services.lambdamicrovms.model.CreateMicrovmImageRequest.builder().build()));
+      assertThrows(UnsupportedOperationException.class,
+          () -> cloud.controlPlane().aws().deleteMicrovmImage(r -> r.imageIdentifier("default")));
+      assertThrows(IllegalArgumentException.class, () -> cloud.image("custom"));
+      assertThrows(IllegalArgumentException.class,
+          () -> cloud.controlPlane().aws().runMicrovm(
+              RunMicrovmRequest.builder().imageIdentifier("default").imageVersion("1").build()));
+      var failure = assertThrows(IllegalArgumentException.class,
+          () -> cloud.controlPlane().aws().runMicrovm(
+              RunMicrovmRequest.builder().imageIdentifier("custom").build()));
+      assertTrue(failure.getMessage().contains("preconfigured default image"));
+    }
   }
 }

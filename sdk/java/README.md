@@ -76,7 +76,7 @@ Sign in with `vmnest login`, then create an automation credential with
 `VMNEST_API_TOKEN`; `VMNEST_API_URL` defaults to `https://vmnest.cc`.
 Java uses this explicit SDK credential rather than reading the CLI's protected login file.
 New accounts require admin activation. See `vmnest pricing` for running, suspended,
-lifecycle and custom-image-build charges, and `vmnest billing` for your balance.
+lifecycle charges, and `vmnest billing` for your balance.
 
 ```java
 import io.github.jnh12.vmnest.*;
@@ -95,18 +95,16 @@ try (var cloud = HostedClient.fromEnvironment();
 ```
 
 Existing `Sandbox`, `SandboxFiles` and HTTP/WebSocket forwarding methods work unchanged.
-For custom image IDs, duration or idle policy, pass an AWS-shaped `RunMicrovmRequest` to
+For duration or idle policy, pass an AWS-shaped `RunMicrovmRequest` to
 `Sandbox.create` with `cloud.controlPlane()`; the hosted transport validates and converts
 it to the public API. AWS roles, networking and image-version overrides are self-hosted options.
 `SandboxRegistry(cloud.controlPlane())` resolves account-owned names on the server and does
 not read or overwrite your local self-hosted state.
 
-Use `cloud.images()` for list/inspect/remove/prune and `cloud.observability()` for logs and
+Use `cloud.images()` to list/inspect the preconfigured default image and `cloud.observability()` for logs and
 metrics. Hosted metrics are current guest-reported samples, not billing or historical data.
-`cloud.buildImage(name, directory)` uploads a guest directory and queues a build;
-`cloud.waitForImage(imageId, Duration.ofMinutes(15))` waits for it to become active.
-Custom guest directories must include the guest agent and lifecycle hooks. Infrastructure
-provisioning remains an operator/self-hosted operation.
+Custom image builds, uploads and removal are available only in self-hosted mode.
+Infrastructure provisioning remains an operator/self-hosted operation.
 
 ## Usage (self-hosted)
 

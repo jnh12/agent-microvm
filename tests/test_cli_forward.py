@@ -139,7 +139,11 @@ def _serve_once(server_sock: socket.socket, respond: bytes, result: dict) -> Non
     result["conn"] = conn
 
 
-def test_websocket_handshake_and_relay_forwards_101_and_relays_frames():
+@pytest.mark.parametrize("initial_payload", [b"post-handshake-payload", b""])
+@pytest.mark.parametrize("subprotocol", [b"lambda-microvms", b"chat"])
+def test_websocket_handshake_and_relay_forwards_101_and_relays_frames(
+    initial_payload, subprotocol
+):
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_sock.bind(("127.0.0.1", 0))
     server_sock.listen(1)
@@ -150,8 +154,10 @@ def test_websocket_handshake_and_relay_forwards_101_and_relays_frames():
         target=_serve_once,
         args=(
             server_sock,
-            b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n"
-            b"post-handshake-payload",
+            b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+            b"X-aws-proxy-auth: tok123\r\nX-aws-proxy-port: 9000\r\nSec-WebSocket-Protocol: "
+            + subprotocol + b"\r\n\r\n"
+            + initial_payload,
             result,
         ),
     )
@@ -165,7 +171,8 @@ def test_websocket_handshake_and_relay_forwards_101_and_relays_frames():
         Host="localhost",
         Connection="Upgrade",
         Upgrade="websocket",
-        **{"Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", "Sec-WebSocket-Version": "13"},
+        **{"Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", "Sec-WebSocket-Version": "13",
+           "Sec-WebSocket-Protocol": "chat"},
     )
     handler.connection = client_far
 
@@ -182,22 +189,23 @@ def test_websocket_handshake_and_relay_forwards_101_and_relays_frames():
     relay_thread.start()
     server_thread.join(timeout=5)
 
-    # The client sees the upstream's 101 response, then the payload the fake
-    # upstream sent right after it, relayed straight through.
+    # The server may send a first frame immediately, or wait for the client.
     received = b""
     client_near.settimeout(5)
-    while len(received) < len(b"HTTP/1.1 101") + 100:
+    while b"\r\n\r\n" not in received or initial_payload not in received:
         chunk = client_near.recv(4096)
         if not chunk:
             break
         received += chunk
-        if b"post-handshake-payload" in received:
-            break
     assert received.startswith(b"HTTP/1.1 101 Switching Protocols")
-    assert b"post-handshake-payload" in received
+    assert initial_payload in received
+    assert b"X-aws-proxy-" not in received
+    assert b"lambda-microvms" not in received
+    assert (b"Sec-WebSocket-Protocol: chat" in received) == (subprotocol == b"chat")
 
     # Bidirectional: bytes from the client reach the fake upstream too.
     client_near.sendall(b"ping-from-client")
+    result["conn"].settimeout(2)
     assert result["conn"].recv(4096) == b"ping-from-client"
 
     # The auth token and target port travelled as subprotocols, not headers.

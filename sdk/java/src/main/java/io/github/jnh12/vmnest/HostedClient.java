@@ -15,6 +15,8 @@ import software.amazon.awssdk.services.lambdamicrovms.model.*;
 
 /** VMNest Cloud transport. Credentials authorize your account, never an AWS account. */
 public final class HostedClient implements AutoCloseable {
+  static final String IMAGE_MESSAGE = "Hosted computers use the preconfigured default image. "
+      + "Custom images require self-hosted mode.";
   private final URI url;
   private final String token;
   private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();
@@ -40,6 +42,8 @@ public final class HostedClient implements AutoCloseable {
   }
 
   public ControlPlane controlPlane() { return control; }
+
+  static boolean usesHostedTransport(LambdaMicrovmsClient client) { return client instanceof Bridge; }
 
   public JsonNode account() { return request("GET", "/v1/me", null, null); }
 
@@ -133,8 +137,9 @@ public final class HostedClient implements AutoCloseable {
     if (request.executionRoleArn() != null || !request.egressNetworkConnectors().isEmpty()
         || !request.ingressNetworkConnectors().isEmpty())
       throw new IllegalArgumentException("AWS roles and connectors require self-hosted mode");
-    if (request.imageVersion() != null)
-      throw new IllegalArgumentException("Hosted images are immutable; select the image ID");
+    if (request.imageVersion() != null || (request.imageIdentifier() != null
+        && !"default".equals(request.imageIdentifier())))
+      throw new IllegalArgumentException(IMAGE_MESSAGE);
     var body = new LinkedHashMap<String, Object>();
     body.put("name", name);
     body.put("image", Objects.requireNonNullElse(request.imageIdentifier(), "default"));
@@ -171,41 +176,13 @@ public final class HostedClient implements AutoCloseable {
     return result;
   }
 
-  public JsonNode image(String id) { return request("GET", "/v1/images/" + part(id), null, null); }
+  public JsonNode image(String id) {
+    if (!"default".equals(id)) throw new IllegalArgumentException(IMAGE_MESSAGE);
+    return request("GET", "/v1/images/default", null, null);
+  }
 
   public JsonNode buildImage(String name, Path directory) throws IOException, InterruptedException {
-    if (!Images.isGuestDirectory(directory)) throw new IOException("Guest requires a Dockerfile");
-    Path archive = Files.createTempFile("vmnest-image-", ".zip");
-    try {
-      Images.archive(directory, archive);
-      var upload = request("POST", "/v1/images/uploads",
-          Map.of("name", name, "size_bytes", Files.size(archive)), null);
-      URI destination = URI.create(upload.path("url").asText());
-      if (!"https".equals(destination.getScheme())) throw new IOException("HTTPS upload required");
-      String boundary = "vmnest-" + UUID.randomUUID();
-      var parts = new ArrayList<HttpRequest.BodyPublisher>();
-      var fields = upload.path("fields").fields();
-      while (fields.hasNext()) {
-        var field = fields.next();
-        if (!field.getKey().matches("[A-Za-z0-9_-]+")) throw new IOException("Invalid upload field");
-        parts.add(HttpRequest.BodyPublishers.ofString("--" + boundary
-            + "\r\nContent-Disposition: form-data; name=\"" + field.getKey() + "\"\r\n\r\n"
-            + field.getValue().asText() + "\r\n"));
-      }
-      parts.add(HttpRequest.BodyPublishers.ofString("--" + boundary
-          + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"guest.zip\""
-          + "\r\nContent-Type: application/zip\r\n\r\n"));
-      parts.add(HttpRequest.BodyPublishers.ofFile(archive));
-      parts.add(HttpRequest.BodyPublishers.ofString("\r\n--" + boundary + "--\r\n"));
-      var response = http.send(HttpRequest.newBuilder(destination).timeout(Duration.ofMinutes(3))
-          .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-          .POST(HttpRequest.BodyPublishers.concat(parts.toArray(HttpRequest.BodyPublisher[]::new)))
-          .build(), HttpResponse.BodyHandlers.discarding());
-      if (response.statusCode() < 200 || response.statusCode() >= 300)
-        throw new IOException("Guest image upload failed (" + response.statusCode() + ")");
-      return request("POST", "/v1/images", Map.of("name", name,
-          "upload_id", upload.path("upload_id").asText()), UUID.randomUUID().toString());
-    } finally { Files.deleteIfExists(archive); }
+    throw new UnsupportedOperationException(IMAGE_MESSAGE);
   }
 
   public JsonNode waitForImage(String id, Duration timeout) throws InterruptedException, TimeoutException {
@@ -258,9 +235,9 @@ public final class HostedClient implements AutoCloseable {
       return CreateMicrovmAuthTokenResponse.builder().authToken(Map.of("X-aws-proxy-auth", result.path("token").asText())).build();
     }
     @Override public ListMicrovmImagesResponse listMicrovmImages(ListMicrovmImagesRequest request) {
-      var response = HostedClient.this.request("GET", "/v1/images", null, null);
+      var response = List.of(image("default"));
       var result = new ArrayList<MicrovmImageSummary>();
-      for (var item : response.isArray() ? response : response.path("items"))
+      for (var item : response)
         result.add(MicrovmImageSummary.builder().name(item.path("name").asText())
             .imageArn(item.path("id").asText()).state(item.path("state").asText())
             .latestActiveImageVersion("ACTIVE".equals(item.path("state").asText())
@@ -268,9 +245,9 @@ public final class HostedClient implements AutoCloseable {
       return ListMicrovmImagesResponse.builder().items(result).build();
     }
     @Override public ListManagedMicrovmImagesResponse listManagedMicrovmImages(ListManagedMicrovmImagesRequest request) {
-      var response = HostedClient.this.request("GET", "/v1/images?managed=true", null, null);
+      var response = List.of(image("default"));
       var result = new ArrayList<ManagedMicrovmImageSummary>();
-      for (var item : response.isArray() ? response : response.path("items"))
+      for (var item : response)
         result.add(ManagedMicrovmImageSummary.builder()
             .imageArn(item.path("id").asText()).build());
       return ListManagedMicrovmImagesResponse.builder().items(result).build();
@@ -289,8 +266,10 @@ public final class HostedClient implements AutoCloseable {
           .stateReason(item.path("error").asText("Hosted image build failed")).build();
     }
     @Override public DeleteMicrovmImageResponse deleteMicrovmImage(DeleteMicrovmImageRequest request) {
-      HostedClient.this.request("DELETE", "/v1/images/" + part(request.imageIdentifier()), null, null);
-      return DeleteMicrovmImageResponse.builder().build();
+      throw new UnsupportedOperationException(IMAGE_MESSAGE);
+    }
+    @Override public CreateMicrovmImageResponse createMicrovmImage(CreateMicrovmImageRequest request) {
+      throw new UnsupportedOperationException(IMAGE_MESSAGE);
     }
   }
 }

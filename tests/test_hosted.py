@@ -265,34 +265,46 @@ def test_mcp_lifecycle_uses_the_hosted_sdk(cloud):
     load_config.cache_clear()
 
 
-def test_guest_upload_never_sends_account_bearer_to_storage(monkeypatch, tmp_path):
-    source = tmp_path / "guest"
-    source.mkdir()
-    (source / "Dockerfile").write_text("FROM example\n")
-    requests = []
+def test_hosted_custom_images_fail_before_filesystem_or_network(cloud, tmp_path):
+    client = HostedClient()
+    operations = [
+        lambda: client.build_image("custom", tmp_path / "does-not-exist"),
+        lambda: client.create_microvm_image(name="custom"),
+        lambda: client.delete_microvm_image("default"),
+        lambda: client.image("custom"),
+        lambda: client.run_microvm(imageIdentifier="default", imageVersion="1"),
+        lambda: asyncio.run(Sandbox.create("work", image_arn="custom")),
+    ]
+    for operation in operations:
+        with pytest.raises(ControlPlaneError, match="preconfigured default image"):
+            operation()
+    result = CliRunner().invoke(app, ["image", "build", "missing", "--name", "custom"])
+    assert result.exit_code == 1
+    assert "preconfigured default image" in result.output
+    assert not cloud[0]
 
-    def handle(request):
-        requests.append(request)
-        if request.url.host == "storage.example":
-            assert "authorization" not in request.headers
-            assert b"guest.zip" in request.content
-            return httpx.Response(204)
-        assert request.headers["authorization"] == "Bearer private-token"
-        if request.url.path.endswith("/uploads"):
-            return httpx.Response(
-                200,
-                json={
-                    "upload_id": "upload-one",
-                    "url": "https://storage.example",
-                    "fields": {"key": "tenant-one/code.zip"},
-                },
-            )
-        return httpx.Response(202, json={"id": "image-one", "state": "BUILDING"})
 
-    original = httpx.Client
-    monkeypatch.setattr(
-        httpx, "Client", lambda **kw: original(transport=httpx.MockTransport(handle), **kw)
-    )
-    result = HostedClient("https://cloud.example", "private-token").build_image("python", source)
-    assert result["id"] == "image-one"
-    assert len(requests) == 3
+def test_hosted_image_catalog_only_reads_default(cloud, monkeypatch):
+    calls = []
+
+    def request(self, method, path, **kwargs):
+        calls.append((method, path))
+        return {"id": "default", "name": "default", "state": "ACTIVE"}
+
+    monkeypatch.setattr(HostedClient, "request", request)
+    client = HostedClient()
+    assert client.list_microvm_images()["items"][0]["imageArn"] == "default"
+    assert client.list_managed_microvm_images()["items"][0]["imageArn"] == "default"
+    assert calls == [("GET", "/v1/images/default")] * 2
+
+
+def test_hosted_mcp_omits_image_mutation_tools(monkeypatch):
+    pytest.importorskip("mcp")
+    from agent_sandbox_mcp.server import build_server
+
+    monkeypatch.setenv("VMNEST_API_TOKEN", "account-one")
+    monkeypatch.setenv("VMNEST_API_URL", "https://cloud.example")
+    monkeypatch.delenv("VMNEST_MODE", raising=False)
+    names = {tool.name for tool in asyncio.run(build_server().list_tools())}
+    assert {"image_list", "image_inspect"} <= names
+    assert not {"image_remove", "image_prune", "image_build"} & names

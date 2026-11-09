@@ -6,8 +6,6 @@ import base64
 import ctypes
 import json
 import os
-import shutil
-import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -18,6 +16,10 @@ import httpx
 from agent_sandbox.errors import ControlPlaneError
 
 DEFAULT_API_URL = "https://vmnest.cc"
+HOSTED_IMAGE_MESSAGE = (
+    "Hosted computers use the preconfigured default image. "
+    "Custom images require self-hosted mode."
+)
 
 
 def config_path() -> Path:
@@ -152,6 +154,8 @@ class HostedClient:
         return response.json() if response.content else {}
 
     def list(self, resource: str, **params) -> list[dict]:
+        if resource == "images":
+            return [self.image("default")]
         result = []
         seen = set()
         if resource == "sandboxes":
@@ -194,10 +198,10 @@ class HostedClient:
             raise ControlPlaneError(
                 "AWS roles and network connectors are only available in self-hosted mode"
             )
-        if kwargs.get("imageVersion"):
-            raise ControlPlaneError(
-                "Hosted images are immutable; select the image ID instead of image_version"
-            )
+        if kwargs.get("imageVersion") is not None or kwargs.get("imageIdentifier") not in (
+            None, "default"
+        ):
+            raise ControlPlaneError(HOSTED_IMAGE_MESSAGE)
         body = {
             "name": kwargs.get("name") or "vmnest-" + uuid.uuid4().hex[:12],
             "duration": kwargs.get("maximumDurationInSeconds", 3600),
@@ -279,45 +283,15 @@ class HostedClient:
         }
 
     def delete_microvm_image(self, imageIdentifier: str) -> dict:
-        return self.request("DELETE", "/v1/images/" + quote(imageIdentifier, safe=""))
+        raise ControlPlaneError(HOSTED_IMAGE_MESSAGE)
 
     def build_image(self, name: str, directory: str | Path) -> dict:
-        """Upload a guest directory and queue a tenant-owned image build."""
-        from agent_sandbox.guest_source import is_guest_dir
-        from agent_sandbox.infra.archive import zip_dir
-
-        if not is_guest_dir(str(directory)):
-            raise ControlPlaneError("Guest directory must contain a Dockerfile")
-        with tempfile.TemporaryDirectory() as temporary:
-            archive = Path(temporary) / "guest.zip"
-            with zip_dir(str(directory)) as source, archive.open("wb") as destination:
-                shutil.copyfileobj(source, destination)
-            return self._upload_image(name, archive)
-
-    def _upload_image(self, name: str, archive: Path) -> dict:
-        upload = self.request(
-            "POST", "/v1/images/uploads", json={"name": name, "size_bytes": archive.stat().st_size}
-        )
-        if urlparse(upload["url"]).scheme != "https":
-            raise ControlPlaneError("Image upload URL must use HTTPS")
-        try:
-            with archive.open("rb") as stream, httpx.Client(timeout=180) as client:
-                response = client.post(
-                    upload["url"],
-                    data=upload["fields"],
-                    files={"file": ("guest.zip", stream, "application/zip")},
-                )
-                response.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise ControlPlaneError("Guest image upload failed") from exc
-        return self.request(
-            "POST",
-            "/v1/images",
-            json={"name": name, "upload_id": upload["upload_id"]},
-            headers={"Idempotency-Key": str(uuid.uuid4())},
-        )
+        """Hosted images are preconfigured; custom builds are self-hosted only."""
+        raise ControlPlaneError(HOSTED_IMAGE_MESSAGE)
 
     def image(self, image_id: str) -> dict:
+        if image_id != "default":
+            raise ControlPlaneError(HOSTED_IMAGE_MESSAGE)
         return self.request("GET", "/v1/images/" + quote(image_id, safe=""))
 
     def wait_for_image(self, image_id: str, timeout: float = 900) -> dict:
@@ -333,10 +307,7 @@ class HostedClient:
         raise ControlPlaneError(f"Image {image_id} did not become active within {timeout}s")
 
     def create_microvm_image(self, **kwargs):
-        raise ControlPlaneError(
-            "Hosted builds use HostedClient.build_image(name, directory), "
-            "without S3 or IAM parameters"
-        )
+        raise ControlPlaneError(HOSTED_IMAGE_MESSAGE)
 
     def filter_log_events(self, *, logGroupName: str, **kwargs) -> dict:
         prefix = "/aws/lambda-microvms/"

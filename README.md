@@ -217,7 +217,7 @@ asyncio.run(main())
 ```
 
 MCP uses the same account: run `vmnest mcp` after login. Lifecycle, files, execution, logs,
-metrics and image tools use the hosted API. For CI, Java, or another agent, create a separate
+metrics and default-image inspection use the hosted API. For CI, Java, or another agent, create a separate
 credential with `vmnest token create --name my-agent` and store its output as the secret
 `VMNEST_API_TOKEN`. Do not put it in source control. `VMNEST_API_URL` changes the API origin;
 a saved credential is never reused for a different origin. See the [Java hosted example](sdk/java/README.md#hosted-use).
@@ -226,17 +226,14 @@ CLI and automation tokens expire after 30 days; sign in or issue a replacement b
 Hosted CPU/memory metrics are current guest-reported diagnostic samples. They are not billing
 measurements or historical CloudWatch metrics.
 
-Build custom guest images with `vmnest image build ./guest --name my-image` and use the returned
-image ID with `vmnest create app --image IMAGE_ID` once `vmnest image ls` shows `ACTIVE`.
-The SDK equivalent is `HostedClient().build_image("my-image", "./guest")`, followed by
-`wait_for_image(image_id)`. Include the guest agent and lifecycle hooks in custom images.
-Images have immutable IDs; AWS roles, buckets and network connectors are managed by the service.
+Hosted computers use one preconfigured `default` image. Custom image builds and uploads
+are available in self-hosted mode. AWS roles, buckets and network connectors are managed by the service.
 CPU and memory come from the image, as in self-hosted mode; the SDK's `cpus`/`memory` arguments
 do not resize a running image. Explicit `IdlePolicy` values are supported within the maximum
 lifetime; omitted policy uses the service default.
 
 The initial pilot tariff is **$1.08/running hour**, **$0.0036/suspended hour**, **$0.10 per
-requested launch/suspend/resume**, and **$1 per custom image build**. Check `vmnest pricing`
+requested launch/suspend/resume**. Check `vmnest pricing`
 for the current rates before use. Charges are recorded on your account with manual payments;
 this is an operator-approved pilot tariff, not a guarantee of AWS transfer-cost coverage.
 The service reserves the permitted lifetime against your account limit before launching.

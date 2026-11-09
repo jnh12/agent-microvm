@@ -17,12 +17,13 @@ from rich.table import Table
 
 from agent_sandbox.control_plane import ControlPlane
 from agent_sandbox.errors import SandboxError
-from agent_sandbox.hosted import HostedClient, enabled as hosted_enabled
+from agent_sandbox.hosted import HOSTED_IMAGE_MESSAGE, HostedClient
+from agent_sandbox.hosted import enabled as hosted_enabled
 from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
-from .state import SandboxRecord, StateStore
 from .auth import register as register_auth
+from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
     name="vmnest",
@@ -48,7 +49,10 @@ err_console = Console(stderr=True)
 @infra_app.callback()
 def _infra_mode() -> None:
     if hosted_enabled():
-        _fail("Infrastructure is managed by VMNest Cloud. Set VMNEST_MODE=self-hosted to manage your own AWS resources.")
+        _fail(
+            "Infrastructure is managed by VMNest Cloud. "
+            "Set VMNEST_MODE=self-hosted to manage your own AWS resources."
+        )
 
 
 def _run(coro):
@@ -164,7 +168,9 @@ def create(
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
     cpus: int = typer.Option(1, "--cpus", help="vCPU count."),
     memory: int = typer.Option(512, "--memory", "-m", help="Memory in MB."),
-    duration: int = typer.Option(3600, "--duration", min=120, max=28800, help="Hosted lifetime in seconds."),
+    duration: int = typer.Option(
+        3600, "--duration", min=120, max=28800, help="Hosted lifetime in seconds."
+    ),
     role: str | None = typer.Option(None, "--role", help="Execution role ARN."),
     region: str | None = typer.Option(None, "--region", help="AWS region."),
     egress_connector: str | None = typer.Option(
@@ -405,7 +411,7 @@ def metrics(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
 ) -> None:
-    """Fetch recent CloudWatch metrics for a sandbox (best-effort)."""
+    """Show current guest metrics (hosted) or CloudWatch samples (self-hosted)."""
     rec = _require_record(name)
     _print_cw_metrics(rec, region=region or rec.region)
 
@@ -429,6 +435,8 @@ def image_build(
     bundled in the installed package (so a pip install can build without a
     repo checkout).
     """
+    if hosted_enabled():
+        _fail(HOSTED_IMAGE_MESSAGE)
     import boto3
 
     from agent_sandbox.guest_source import is_guest_dir, resolve_guest_dir
@@ -444,14 +452,6 @@ def image_build(
         except FileNotFoundError as exc:
             _fail(str(exc))
 
-    if hosted_enabled():
-        if bucket or role:
-            _fail("--bucket and --role are only available in self-hosted mode")
-        try:
-            console.print_json(data=HostedClient().build_image(name, src))
-        except SandboxError as exc:
-            _fail(str(exc))
-        return
     if not bucket:
         _fail("--bucket is required in self-hosted mode")
     key = f"microvm-images/{name}.zip"
@@ -677,18 +677,28 @@ def _websocket_handshake_and_relay(
         upstream.close()
         return
 
-    upstream_reader = upstream.makefile("rb")
-    status_line = upstream_reader.readline()
-    if not status_line:
-        handler.send_error(502, "upstream closed during handshake")
-        upstream.close()
-        return
-    header_bytes = [status_line]
-    while True:
-        line = upstream_reader.readline()
-        header_bytes.append(line)
-        if line in (b"\r\n", b"\n", b""):
-            break
+    # Read only the handshake bytes. A buffered reader can consume a first
+    # frame; peeking to recover it blocks when the server waits for the client.
+    with upstream.makefile("rb", buffering=0) as upstream_reader:
+        status_line = upstream_reader.readline()
+        if not status_line:
+            handler.send_error(502, "upstream closed during handshake")
+            upstream.close()
+            return
+        header_bytes = [status_line]
+        while True:
+            line = upstream_reader.readline()
+            name, _, value = line.partition(b":")
+            if name.lower() in {b"x-aws-proxy-auth", b"x-aws-proxy-port"}:
+                continue
+            if name.lower() == b"sec-websocket-protocol" and value.strip().startswith(
+                b"lambda-microvms"
+            ):
+                # AWS routing is negotiated only on the upstream connection.
+                continue
+            header_bytes.append(line)
+            if line in (b"\r\n", b"\n", b""):
+                break
 
     try:
         handler.connection.sendall(b"".join(header_bytes))
@@ -703,19 +713,7 @@ def _websocket_handshake_and_relay(
         upstream.close()
         return
 
-    # `upstream_reader`'s internal buffer may already hold bytes past the
-    # header boundary (e.g. the first WS frame arriving in the same TCP
-    # segment as the 101 response) -- those are invisible to the raw
-    # `upstream.recv()` calls in `_relay_bidirectional`, so flush them first.
-    pending = upstream_reader.peek()
-    if pending:
-        upstream_reader.read(len(pending))
-        try:
-            handler.connection.sendall(pending)
-        except OSError:
-            upstream.close()
-            return
-
+    upstream.settimeout(None)
     try:
         _relay_bidirectional(handler.connection, upstream)
     finally:

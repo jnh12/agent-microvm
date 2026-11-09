@@ -89,7 +89,7 @@ def register(app: typer.Typer) -> None:
 
     @app.command()
     def pricing() -> None:
-        """Show current hosted rates, including lifecycle and image-build fees."""
+        """Show current hosted running, suspended and lifecycle rates."""
         try:
             console.print_json(data=HostedClient().request("GET", "/v1/pricing"))
         except SandboxError as exc:

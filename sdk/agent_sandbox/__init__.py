@@ -6,19 +6,21 @@ to the ``lambda-microvms`` control plane and to a guest agent (``agentd``) baked
 into the MicroVM image over its dedicated HTTPS endpoint.
 """
 
+from agent_sandbox.agents import Agents
 from agent_sandbox.errors import (
     AgentError,
     ControlPlaneError,
     SandboxError,
     SandboxTimeoutError,
 )
-from agent_sandbox.models import ExecResult, SandboxConfig, SandboxState
 from agent_sandbox.hosted import HostedClient
+from agent_sandbox.models import ExecResult, SandboxConfig, SandboxState
 from agent_sandbox.sandbox import Sandbox
 
 __all__ = [
     "Sandbox",
     "HostedClient",
+    "Agents",
     "SandboxConfig",
     "SandboxState",
     "ExecResult",
@@ -28,4 +30,4 @@ __all__ = [
     "SandboxTimeoutError",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

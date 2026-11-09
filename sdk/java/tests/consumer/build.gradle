@@ -4,6 +4,6 @@ repositories {
     mavenCentral()
 }
 dependencies {
-    implementation "io.github.jnh12:vmnest-java:${providers.gradleProperty('sdkVersion').getOrElse('0.2.0-SNAPSHOT')}"
+    implementation "io.github.jnh12:vmnest-java:${providers.gradleProperty('sdkVersion').getOrElse('0.3.0-SNAPSHOT')}"
 }
 tasks.withType(JavaCompile).configureEach { options.release = 21 }

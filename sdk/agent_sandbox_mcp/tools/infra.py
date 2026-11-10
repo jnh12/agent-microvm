@@ -80,11 +80,6 @@ def build_outputs(
     stack: str | None = None,
 ) -> dict:
     """Assemble the resolved infra outputs the sandbox tools would use."""
-    from agent_sandbox.hosted import HostedClient, enabled
-
-    if enabled():
-        return {"mode": "hosted", "managed": True, "region": "us-east-1",
-                "url": HostedClient().url, "image_arn": {"value": "default", "source": "hosted"}}
     proj, stk, outputs = _resolve_infra(setup_file, project, stack)
     image = _resolved(ENV_IMAGE_ARN, outputs.get("image_arn"))
     role = _resolved(ENV_ROLE_ARN, outputs.get("execution_role_arn"))
@@ -141,9 +136,6 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         with `vmnest infra up`, then call `infra_outputs(project=...)` to fetch the
         image/role/region for the one you want.
         """
-        from agent_sandbox.hosted import enabled
-        if enabled():
-            return ok({"mode": "hosted", "managed": True, "stacks": [], "count": 0})
         from agent_sandbox.infra.state import InfraStateStore
 
         stacks = [

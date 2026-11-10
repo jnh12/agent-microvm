@@ -14,15 +14,6 @@ if TYPE_CHECKING:
 
 
 def _check(config: Config) -> dict:
-    from agent_sandbox.hosted import HostedClient, enabled
-
-    if enabled():
-        try:
-            client = HostedClient()
-            account = client.request("GET", "/v1/me")
-            return {"mode": "hosted", "url": client.url, "ready": True, "account": account}
-        except Exception as exc:
-            return {"mode": "hosted", "ready": False, "error": str(exc)}
     result: dict = {
         "region": config.region,
         "boto3_available": False,
@@ -85,9 +76,6 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
         state = _check(config)
         if state["ready"]:
             return ok({"message": "backend already provisioned", "runtime": state})
-        if state.get("mode") == "hosted":
-            return err("Run vmnest login to renew your hosted account access.",
-                       code="not_authenticated", runtime=state)
         return err(
             "Backend not provisioned. Run `vmnest infra up` (see repo README) to "
             "create the MicroVM image and execution role, or set "

@@ -17,13 +17,9 @@ from rich.table import Table
 
 from agent_sandbox.control_plane import ControlPlane
 from agent_sandbox.errors import SandboxError
-from agent_sandbox.hosted import HOSTED_IMAGE_MESSAGE, HostedClient
-from agent_sandbox.hosted import enabled as hosted_enabled
 from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
-from .agents import register as register_agents
-from .auth import register as register_auth
 from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
@@ -31,7 +27,6 @@ app = typer.Typer(
     help="agent-microvm: isolated microVM sandboxes on AWS Lambda MicroVMs.",
     no_args_is_help=True,
     add_completion=False,
-    pretty_exceptions_show_locals=False,
 )
 image_app = typer.Typer(name="image", help="Manage MicroVM images.", no_args_is_help=True)
 app.add_typer(image_app)
@@ -41,20 +36,9 @@ infra_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(infra_app)
-register_auth(app)
-register_agents(app)
 
 console = Console()
 err_console = Console(stderr=True)
-
-
-@infra_app.callback()
-def _infra_mode() -> None:
-    if hosted_enabled():
-        _fail(
-            "Infrastructure is managed by VMNest Cloud. "
-            "Set VMNEST_MODE=self-hosted to manage your own AWS resources."
-        )
 
 
 def _run(coro):
@@ -104,19 +88,13 @@ def _infra_outputs() -> dict:
 
 
 def _resolve_image(image: str | None) -> str:
-    if hosted_enabled():
-        return image or "default"
     resolved = image or os.environ.get(ENV_IMAGE_ARN) or _infra_outputs().get("image_arn")
     if not resolved:
         _fail(f"--image is required (or set ${ENV_IMAGE_ARN}, or run `vmnest infra up`).")
     return resolved  # type: ignore[return-value]
 
 
-def _resolve_role(role: str | None) -> str | None:
-    if hosted_enabled():
-        if role:
-            _fail("--role is only available in self-hosted mode")
-        return None
+def _resolve_role(role: str | None) -> str:
     resolved = (
         role or os.environ.get(ENV_ROLE_ARN) or _infra_outputs().get("execution_role_arn")
     )
@@ -134,8 +112,6 @@ def _resolve_egress_connectors(
     pulls the provisioned connector from infra outputs. Returns ``None`` when no
     connector should be attached (the default).
     """
-    if hosted_enabled() and (egress_connector or use_infra):
-        _fail("AWS network connectors are only available in self-hosted mode")
     if egress_connector:
         return [egress_connector]
     if use_infra:
@@ -170,9 +146,6 @@ def create(
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
     cpus: int = typer.Option(1, "--cpus", help="vCPU count."),
     memory: int = typer.Option(512, "--memory", "-m", help="Memory in MB."),
-    duration: int = typer.Option(
-        3600, "--duration", min=120, max=28800, help="Hosted lifetime in seconds."
-    ),
     role: str | None = typer.Option(None, "--role", help="Execution role ARN."),
     region: str | None = typer.Option(None, "--region", help="AWS region."),
     egress_connector: str | None = typer.Option(
@@ -194,7 +167,6 @@ def create(
             image_arn=image_arn,
             cpus=cpus,
             memory=memory,
-            duration=duration,
             execution_role_arn=role_arn,
             region=region,
             egress_network_connectors=egress_connectors,
@@ -413,7 +385,7 @@ def metrics(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
 ) -> None:
-    """Show current guest metrics (hosted) or CloudWatch samples (self-hosted)."""
+    """Fetch recent CloudWatch metrics for a sandbox (best-effort)."""
     rec = _require_record(name)
     _print_cw_metrics(rec, region=region or rec.region)
 
@@ -427,7 +399,7 @@ def image_build(
         None, help="Guest dir with a Dockerfile (default: ./guest, else the bundled guest)."
     ),
     name: str = typer.Option(..., "--name", "-n", help="Image name."),
-    bucket: str | None = typer.Option(None, "--bucket", "-b", help="Self-hosted S3 build bucket."),
+    bucket: str = typer.Option(..., "--bucket", "-b", help="S3 bucket for the build zip."),
     role: str | None = typer.Option(None, "--role"),
     region: str | None = typer.Option(None, "--region"),
 ) -> None:
@@ -437,8 +409,6 @@ def image_build(
     bundled in the installed package (so a pip install can build without a
     repo checkout).
     """
-    if hosted_enabled():
-        _fail(HOSTED_IMAGE_MESSAGE)
     import boto3
 
     from agent_sandbox.guest_source import is_guest_dir, resolve_guest_dir
@@ -454,8 +424,6 @@ def image_build(
         except FileNotFoundError as exc:
             _fail(str(exc))
 
-    if not bucket:
-        _fail("--bucket is required in self-hosted mode")
     key = f"microvm-images/{name}.zip"
     s3 = boto3.client("s3", region_name=region)
     R.upload_guest(s3, bucket=bucket, key=key, guest_dir=src)
@@ -679,28 +647,18 @@ def _websocket_handshake_and_relay(
         upstream.close()
         return
 
-    # Read only the handshake bytes. A buffered reader can consume a first
-    # frame; peeking to recover it blocks when the server waits for the client.
-    with upstream.makefile("rb", buffering=0) as upstream_reader:
-        status_line = upstream_reader.readline()
-        if not status_line:
-            handler.send_error(502, "upstream closed during handshake")
-            upstream.close()
-            return
-        header_bytes = [status_line]
-        while True:
-            line = upstream_reader.readline()
-            name, _, value = line.partition(b":")
-            if name.lower() in {b"x-aws-proxy-auth", b"x-aws-proxy-port"}:
-                continue
-            if name.lower() == b"sec-websocket-protocol" and value.strip().startswith(
-                b"lambda-microvms"
-            ):
-                # AWS routing is negotiated only on the upstream connection.
-                continue
-            header_bytes.append(line)
-            if line in (b"\r\n", b"\n", b""):
-                break
+    upstream_reader = upstream.makefile("rb")
+    status_line = upstream_reader.readline()
+    if not status_line:
+        handler.send_error(502, "upstream closed during handshake")
+        upstream.close()
+        return
+    header_bytes = [status_line]
+    while True:
+        line = upstream_reader.readline()
+        header_bytes.append(line)
+        if line in (b"\r\n", b"\n", b""):
+            break
 
     try:
         handler.connection.sendall(b"".join(header_bytes))
@@ -715,7 +673,19 @@ def _websocket_handshake_and_relay(
         upstream.close()
         return
 
-    upstream.settimeout(None)
+    # `upstream_reader`'s internal buffer may already hold bytes past the
+    # header boundary (e.g. the first WS frame arriving in the same TCP
+    # segment as the 101 response) -- those are invisible to the raw
+    # `upstream.recv()` calls in `_relay_bidirectional`, so flush them first.
+    pending = upstream_reader.peek()
+    if pending:
+        upstream_reader.read(len(pending))
+        try:
+            handler.connection.sendall(pending)
+        except OSError:
+            upstream.close()
+            return
+
     try:
         _relay_bidirectional(handler.connection, upstream)
     finally:
@@ -725,7 +695,7 @@ def _websocket_handshake_and_relay(
 def _require_record(name: str) -> SandboxRecord:
     try:
         return StateStore().require(name)
-    except (KeyError, SandboxError) as exc:
+    except KeyError as exc:
         _fail(str(exc))
         raise  # unreachable, keeps type checkers happy
 
@@ -742,13 +712,8 @@ def _print_cw_logs(rec: SandboxRecord, region: str | None, log_group: str | None
     from botocore.exceptions import BotoCoreError, ClientError
 
     group = log_group or f"/aws/lambda-microvms/{rec.microvm_id}"
-    client = HostedClient() if hosted_enabled() else boto3.client("logs", region_name=region)
+    client = boto3.client("logs", region_name=region)
     try:
-        if isinstance(client, HostedClient):
-            events = client.filter_log_events(logGroupName=group).get("events", [])
-            for event in events:
-                console.out(event.get("message", ""))
-            return
         streams = client.describe_log_streams(
             logGroupName=group, orderBy="LastEventTime", descending=True, limit=1
         ).get("logStreams", [])
@@ -760,7 +725,7 @@ def _print_cw_logs(rec: SandboxRecord, region: str | None, log_group: str | None
         ).get("events", [])
         for event in events:
             console.out(event.get("message", ""), end="")
-    except (ClientError, BotoCoreError, SandboxError) as exc:
+    except (ClientError, BotoCoreError) as exc:
         _fail(f"could not read logs from {group}: {exc}")
 
 
@@ -770,7 +735,7 @@ def _print_cw_metrics(rec: SandboxRecord, region: str | None) -> None:
     import boto3
     from botocore.exceptions import BotoCoreError, ClientError
 
-    client = HostedClient() if hosted_enabled() else boto3.client("cloudwatch", region_name=region)
+    client = boto3.client("cloudwatch", region_name=region)
     end = dt.datetime.now(dt.UTC)
     start = end - dt.timedelta(minutes=30)
     table = Table("METRIC", "LATEST")
@@ -789,7 +754,7 @@ def _print_cw_metrics(rec: SandboxRecord, region: str | None) -> None:
             latest = f"{points[-1]['Average']:.1f}" if points else "-"
             table.add_row(metric, latest)
         console.print(table)
-    except (ClientError, BotoCoreError, SandboxError) as exc:
+    except (ClientError, BotoCoreError) as exc:
         _fail(f"could not read metrics: {exc}")
 
 
@@ -1136,8 +1101,6 @@ def forward(
     import time
 
     interval = poll_interval if poll_interval > 0 else _FORWARD_POLL_INTERVAL
-    refresh_interval = 30 if hosted_enabled() else _FORWARD_TOKEN_REFRESH
-    interval = min(interval, refresh_interval)
     last_refresh = time.monotonic()
     status_failures = 0
     try:
@@ -1165,7 +1128,8 @@ def forward(
                         f"[yellow]{name} is unreachable; disconnecting[/yellow]"
                     )
                     break
-            if time.monotonic() - last_refresh >= refresh_interval:
+            # Refresh the auth token roughly every 25 minutes.
+            if time.monotonic() - last_refresh >= _FORWARD_TOKEN_REFRESH:
                 token["value"] = _run(_mint(cp))
                 last_refresh = time.monotonic()
                 console.print("[cyan]token refreshed[/cyan]")

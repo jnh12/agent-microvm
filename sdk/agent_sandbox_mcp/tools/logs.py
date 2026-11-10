@@ -21,10 +21,6 @@ def _log_group(microvm_id: str) -> str:
 
 def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
     def _client(region: str | None):
-        from agent_sandbox.hosted import HostedClient, enabled
-
-        if enabled():
-            return HostedClient()
         import boto3
 
         return boto3.client("logs", region_name=region or config.region)

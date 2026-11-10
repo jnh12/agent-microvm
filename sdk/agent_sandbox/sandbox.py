@@ -78,7 +78,6 @@ class Sandbox:
         egress_network_connectors: list[str] | None = None,
         wait_timeout: float = 120.0,
         verify_tls: bool = True,
-        duration: int = 3600,
     ) -> Sandbox:
         """Launch a new MicroVM and wait until its guest agent is reachable.
 
@@ -86,18 +85,13 @@ class Sandbox:
         image build time), so they configure the SDK record only and are not sent
         to ``run_microvm``. Networking uses network connectors, not subnets/SGs.
         """
-        from agent_sandbox.hosted import enabled
-
-        hosted = enabled()
-        if hosted and (execution_role_arn or ingress_network_connectors or egress_network_connectors):
-            raise SandboxError("AWS roles and network connectors are only available in self-hosted mode")
-        image_arn = image_arn or ("default" if hosted else os.environ.get(ENV_IMAGE_ARN))
-        execution_role_arn = execution_role_arn or (None if hosted else os.environ.get(ENV_ROLE_ARN))
+        image_arn = image_arn or os.environ.get(ENV_IMAGE_ARN)
+        execution_role_arn = execution_role_arn or os.environ.get(ENV_ROLE_ARN)
         if not image_arn:
             raise SandboxError(
                 f"image_arn is required (pass it or set ${ENV_IMAGE_ARN})."
             )
-        if not execution_role_arn and not hosted:
+        if not execution_role_arn:
             raise SandboxError(
                 f"execution_role_arn is required (pass it or set ${ENV_ROLE_ARN})."
             )
@@ -118,12 +112,10 @@ class Sandbox:
         info = await cp.run_microvm(
             image_arn=config.image_arn,
             execution_role_arn=config.execution_role_arn,
-            idle_policy=(idle_policy.to_aws() if idle_policy else None)
-            if hosted else config.idle_policy.to_aws(),
+            idle_policy=config.idle_policy.to_aws(),
             image_version=image_version,
             ingress_network_connectors=config.ingress_network_connectors or None,
             egress_network_connectors=config.egress_network_connectors or None,
-            **({"name": name, "maximum_duration_seconds": duration} if hosted else {}),
         )
         info = await cp.wait_until_running(info.microvm_id, timeout=wait_timeout)
         sandbox = cls(config=config, control_plane=cp, info=info)

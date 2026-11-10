@@ -9,7 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from agent_sandbox_mcp.tools import (
-    agents,
     execution,
     filesystem,
     images,
@@ -26,7 +25,7 @@ if TYPE_CHECKING:
     from agent_sandbox_mcp.config import Config
     from agent_sandbox_mcp.session import SandboxRegistry
 
-_MODULES = (runtime, infra, lifecycle, execution, filesystem, logs, metrics, images, agents)
+_MODULES = (runtime, infra, lifecycle, execution, filesystem, logs, metrics, images)
 
 
 def register_all(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:

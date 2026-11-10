@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from agent_sandbox.hosted import enabled as hosted_enabled
-
 from agent_sandbox_mcp.config import Config
 from agent_sandbox_mcp.envelope import err, ok, tool_handler
 
@@ -53,9 +51,6 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
                     return ok({"managed": managed, "image": item})
         return err(f"image not found: {image_arn}", code="not_found")
 
-    if hosted_enabled():
-        return
-
     @mcp.tool()
     @tool_handler
     async def image_remove(image_arn: str, confirm: bool = False) -> dict:
@@ -94,7 +89,7 @@ def register(mcp: FastMCP, registry: SandboxRegistry, config: Config) -> None:
             arn = _image_arn(item)
             if not arn:
                 continue
-            if arn in in_use or arn == "default":
+            if arn in in_use:
                 kept.append(arn)
             else:
                 await cp.delete_microvm_image(arn)

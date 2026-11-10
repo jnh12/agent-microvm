@@ -32,8 +32,8 @@ INSTRUCTIONS = (
     "code and manage files INSIDE sandboxes instead of on the host: `sandbox_run` "
     "for one-off commands in an ephemeral VM; `sandbox_create` then `sandbox_exec`/"
     "`sandbox_shell` for persistent work; `sandbox_fs_*` for files. Image/role/region "
-    "are managed automatically after `vmnest login` for hosted use, or resolved "
-    "from `vmnest infra` for self-hosted use. Call `runtime_check` for connection status. Every tool returns a JSON "
+    "are auto-wired from `vmnest infra` outputs, so don't ask the user to paste them — "
+    "call `infra_outputs` to pull the resolved values. Every tool returns a JSON "
     "envelope {ok, data|error}."
 )
 

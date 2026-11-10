@@ -53,18 +53,18 @@ public final class Sandbox implements AutoCloseable {
     if (waitTimeout.isZero() || waitTimeout.isNegative())
       throw new IllegalArgumentException("Positive wait timeout required");
     var builder = request.toBuilder();
-    if (request.imageIdentifier() == null && control.hosted == null)
+    if (request.imageIdentifier() == null)
       builder.imageIdentifier(System.getenv("AGENT_SANDBOX_IMAGE_ARN"));
-    if (request.executionRoleArn() == null && control.hosted == null)
+    if (request.executionRoleArn() == null)
       builder.executionRoleArn(System.getenv("AGENT_SANDBOX_EXECUTION_ROLE_ARN"));
-    if (request.idlePolicy() == null && control.hosted == null)
+    if (request.idlePolicy() == null)
       builder.idlePolicy(
           p -> p.maxIdleDurationSeconds(900).suspendedDurationSeconds(300).autoResumeEnabled(true));
     if (request.clientToken() == null) builder.clientToken(UUID.randomUUID().toString());
     var resolved = builder.build();
-    if (control.hosted == null && (resolved.imageIdentifier() == null || resolved.executionRoleArn() == null))
+    if (resolved.imageIdentifier() == null || resolved.executionRoleArn() == null)
       throw new IllegalArgumentException("Image and execution role required");
-    String id = control.runMicrovm(resolved, name).microvmId();
+    String id = control.runMicrovm(resolved).microvmId();
     var sandbox = new Sandbox(name, id, control, port, requestTimeout);
     // On wait failure the exception includes the ID for reconciliation; do not launch again
     // blindly.

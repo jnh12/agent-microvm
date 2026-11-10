@@ -18,11 +18,6 @@ public final class Images {
     this.aws = aws;
   }
 
-  private void requireSelfHosted() {
-    if (HostedClient.usesHostedTransport(aws))
-      throw new UnsupportedOperationException(HostedClient.IMAGE_MESSAGE);
-  }
-
   public static void extractBundledGuest(Path destination) throws IOException {
     Path root = destination.toAbsolutePath().normalize();
     Files.createDirectories(root);
@@ -112,7 +107,6 @@ public final class Images {
   }
 
   public void remove(String arn, boolean confirm) {
-    requireSelfHosted();
     if (!confirm) throw new IllegalArgumentException("confirm=true required");
     try {
       aws.deleteMicrovmImage(r -> r.imageIdentifier(arn));
@@ -121,7 +115,6 @@ public final class Images {
   }
 
   public List<String> prune(boolean confirm) {
-    requireSelfHosted();
     if (!confirm) throw new IllegalArgumentException("confirm=true required");
     var used = new HashSet<String>();
     for (var page : aws.listMicrovmsPaginator(ListMicrovmsRequest.builder().build()))
@@ -133,7 +126,7 @@ public final class Images {
         }
     var removed = new ArrayList<String>();
     for (var image : list())
-      if (!used.contains(image.imageArn()) && !"default".equals(image.imageArn())) {
+      if (!used.contains(image.imageArn())) {
         remove(image.imageArn(), true);
         removed.add(image.imageArn());
       }
@@ -172,7 +165,6 @@ public final class Images {
   public CreateMicrovmImageResponse build(
       Path source, S3Client s3, String bucket, String key, CreateMicrovmImageRequest settings)
       throws IOException {
-    requireSelfHosted();
     Path archive = Files.createTempFile("vmnest-image-", ".zip");
     try {
       archive(source, archive);

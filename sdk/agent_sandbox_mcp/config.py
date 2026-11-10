@@ -71,17 +71,9 @@ class Config:
         return self.default_timeout_ms / 1000.0
 
     def image_arn(self) -> str | None:
-        from agent_sandbox.hosted import enabled
-
-        if enabled():
-            return "default"
         return os.environ.get(ENV_IMAGE_ARN) or _infra_outputs().get("image_arn")
 
     def role_arn(self) -> str | None:
-        from agent_sandbox.hosted import enabled
-
-        if enabled():
-            return None
         return os.environ.get(ENV_ROLE_ARN) or _infra_outputs().get("execution_role_arn")
 
     def egress_connector_arn(self) -> str | None:

@@ -77,7 +77,9 @@ vmnest rm task-vm --json
 
 JSON lifecycle commands return immediately with a VM record, or `{ "items": [...] }`
 for `ls`. Poll `inspect` until `RUNNING` before using a VM, or `TERMINATED` after removal.
-Human create/remove commands wait up to 30 seconds. VM records contain `id`, `name`,
+Human create/remove commands wait up to 30 seconds by default. Set the client
+environment variable `VMNEST_WAIT_SECONDS` to a nonnegative integer to change this;
+zero skips waiting. VM records contain `id`, `name`,
 `state`, `region`, Unix-second timestamps `created_at` and `expires_at`, and `error`.
 Unlike account responses, successful lifecycle records have no `ok` envelope.
 Errors use the same `ok: false` envelope and exit code 1 as account commands.
@@ -88,13 +90,15 @@ A replay returns the original VM even after termination. Use a new key for a new
 Creating an already-active name returns that VM. Names and IDs are accepted by
 `inspect` and `rm`; lists include terminated history and only your own VMs.
 
-The initial hosted configuration allows one active VM per account, in Frankfurt,
+The default hosted configuration allows one active VM per account, in Frankfurt,
 using the service's fixed image and runtime role, with a one-hour maximum lifetime.
 AWS enforces that lifetime even if the API stops. AWS options such as `--role`,
 `--image`, `--region`, `--cpus`, `--memory`, and egress settings are service-managed.
 `UNKNOWN` with `LAUNCH_UNCERTAIN` requires operator reconciliation and continues
 to occupy the account's slot. Retrying never intentionally creates a replacement.
 These limits apply to VMs; account sessions still have no automatic expiry.
+The service operator can configure quotas, lifetime, idle behavior, and recovery
+timings through the [service environment settings](../../vmnest-accounts/README.md).
 
 ## Configuration
 

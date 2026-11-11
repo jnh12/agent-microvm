@@ -157,7 +157,7 @@ class AccountClient:
                     "PROVIDER_UNAVAILABLE": "GitHub is unavailable. Try again shortly.",
                     "VM_NOT_FOUND": "VM not found in your account.",
                     "VM_LIMIT_REACHED": (
-                        "One active VM is allowed. Terminate it before creating another."
+                        "Your active VM limit is reached. Terminate a VM before creating another."
                     ),
                     "REQUEST_CONFLICT": "This request key belongs to another VM name.",
                     "HOSTED_VMS_UNAVAILABLE": "The server has not enabled hosted VMs.",

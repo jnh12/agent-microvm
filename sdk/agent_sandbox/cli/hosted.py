@@ -1,6 +1,7 @@
 """Hosted lifecycle routing for the existing CLI commands."""
 
 import json
+import os
 import time
 import uuid
 from urllib.parse import quote
@@ -17,6 +18,14 @@ def route(ctx, action, *, name=None, request_key=None, as_json=False):
     try:
         if mode() != "hosted":
             return False
+        try:
+            wait_seconds = int(os.environ.get("VMNEST_WAIT_SECONDS", "30"))
+            if wait_seconds < 0:
+                raise ValueError()
+        except ValueError:
+            raise AccountError(
+                "INVALID_CONFIG", "VMNEST_WAIT_SECONDS must be nonnegative."
+            ) from None
         for option in ("image", "role", "region", "cpus", "memory", "egress", "egress_connector"):
             if getattr(ctx.get_parameter_source(option), "name", None) == "COMMANDLINE":
                 raise AccountError(
@@ -52,7 +61,7 @@ def route(ctx, action, *, name=None, request_key=None, as_json=False):
             result = client.authenticated("GET", path)
         # Human commands wait briefly; JSON commands return immediately for agent polling.
         if not as_json and action in {"create", "rm"}:
-            deadline = time.monotonic() + 30
+            deadline = time.monotonic() + wait_seconds
             while result["state"] in {"PENDING", "TERMINATING"} and time.monotonic() < deadline:
                 time.sleep(1)
                 result = client.authenticated("GET", "/v1/vms/" + result["id"])

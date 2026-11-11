@@ -23,6 +23,7 @@ from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 from .accounts import register as register_accounts
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
+from .usage import register as register_usage
 
 app = typer.Typer(
     name="vmnest",
@@ -40,6 +41,7 @@ infra_app = typer.Typer(
 app.add_typer(infra_app)
 register_files(app)
 register_accounts(app)
+register_usage(app)
 
 
 @app.callback()

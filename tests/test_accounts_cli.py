@@ -34,7 +34,7 @@ def test_self_hosted_requires_no_account_or_credential_store(monkeypatch):
 def test_hosted_blocks_unimplemented_commands_before_aws(monkeypatch):
     accounts.save_config({"mode": "hosted", "url": "https://accounts.example.com"})
     runner = CliRunner()
-    for command in ["run", "infra", "image", "mcp", "exec", "stop", "start"]:
+    for command in ["run", "infra", "image", "mcp", "stop", "start"]:
         result = runner.invoke(app, [command])
         assert result.exit_code == 1 and "HOSTED_VMS_UNAVAILABLE" in result.output
     from agent_sandbox_mcp.server import build_server

@@ -26,7 +26,7 @@ vmnest infra init
 
 Setup saves the choice but provisions nothing. Existing direct-AWS commands still
 work without a saved mode. Hosted mode currently supports `create`, `ls`, `inspect`,
-and `rm`. Guest execution, transfers, forwarding, infrastructure, images, and MCP
+`rm`, and `exec`. Transfers, forwarding, infrastructure, images, and MCP
 remain unavailable in hosted mode. It never falls back to local AWS credentials.
 The Python SDK remains the direct-AWS SDK. Switching modes does not log you out.
 
@@ -99,6 +99,33 @@ to occupy the account's slot. Retrying never intentionally creates a replacement
 These limits apply to VMs; account sessions still have no automatic expiry.
 The service operator can configure quotas, lifetime, idle behavior, and recovery
 timings through the [service environment settings](../../vmnest-accounts/README.md).
+
+## Running commands
+
+```sh
+vmnest exec my-vm -- python3 -c "print('hello')"
+vmnest exec my-vm --cwd /tmp --env NAME=world --timeout 60 -- python3 script.py
+vmnest exec my-vm --json -- python3 -V
+```
+
+The same command syntax and flags work in self-hosted mode. Arguments are passed
+directly without shell expansion; explicitly run `sh -c` when you need a shell.
+`--cwd` chooses a guest directory and repeatable `--env KEY=VALUE` overrides guest
+environment variables. Normal output uses stdout/stderr and preserves the command
+exit code. `--json` returns `exit_code`, base64 `stdout`/`stderr`, and `encoding`;
+the CLI still exits with the command's code, including nonzero codes.
+
+Hosted requests use your account session; AWS endpoint credentials stay on the
+server. The service accepts running or auto-resumable suspended VMs, rejects
+terminating/expired VMs, and enforces its configured timeout. Defaults are 30 seconds
+when omitted and a maximum requested timeout of 300 seconds. Self-hosted execution
+has no service-imposed maximum. A guest timeout returns `EXEC_TIMED_OUT` and exit 1.
+Transport failures can return `EXEC_OUTCOME_UNKNOWN`: the command may have run,
+so execution is never automatically retried. There is no job record or reconnect
+facility. Output is buffered until completion; streaming, stdin, PTYs, and managed
+background jobs are not supported. Guest timeout behavior matches the existing
+agent: it kills the direct process, not necessarily detached descendants. VM lifetime
+still bounds the guest itself. Command output is buffered, without an output-size cap.
 
 ## Configuration
 

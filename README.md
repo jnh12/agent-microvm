@@ -6,7 +6,7 @@
 
 Development preview: [hosted accounts and CLI setup](docs/accounts.md).
 This branch adds GitHub account login and account-owned hosted `create`, `ls`,
-`inspect`, and `rm`. Other hosted operations are not implemented yet.
+`inspect`, `rm`, and `exec`. Other hosted operations are not implemented yet.
 
 **Isolated AWS microVM sandboxes for AI agents.**
 

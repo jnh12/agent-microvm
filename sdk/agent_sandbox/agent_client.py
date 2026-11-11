@@ -64,12 +64,12 @@ class AgentClient:
             headers["X-aws-proxy-port"] = str(self._proxy_port)
         return headers
 
-    async def _post(self, path: str, json: dict) -> httpx.Response:
+    async def _post(self, path: str, json: dict, **kwargs) -> httpx.Response:
         headers = await self._token_headers()
-        resp = await self._client.post(path, json=json, headers=headers)
+        resp = await self._client.post(path, json=json, headers=headers, **kwargs)
         if resp.status_code == 401:
             headers = await self._token_headers(force_refresh=True)
-            resp = await self._client.post(path, json=json, headers=headers)
+            resp = await self._client.post(path, json=json, headers=headers, **kwargs)
         return resp
 
     async def health(self) -> bool:
@@ -97,9 +97,12 @@ class AgentClient:
         if timeout is not None:
             payload["timeout"] = timeout
 
-        resp = await self._post("/v1/exec", payload)
+        options = {"timeout": timeout + 10} if timeout is not None else {}
+        resp = await self._post("/v1/exec", payload, **options)
         if resp.status_code != 200:
-            raise AgentError(f"exec failed ({resp.status_code}): {resp.text}")
+            raise AgentError(
+                f"exec failed ({resp.status_code}): {resp.text}", status_code=resp.status_code
+            )
         data = resp.json()
         return ExecResult(
             exit_code=int(data.get("exit_code", -1)),

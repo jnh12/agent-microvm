@@ -21,6 +21,7 @@ from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
+from .hosted import execute as hosted_execute
 from .hosted import route as hosted_route
 from .state import SandboxRecord, StateStore
 
@@ -61,14 +62,14 @@ def entry(ctx: typer.Context):
                    "Run vmnest --help for commands.")
         return
     if ctx.invoked_subcommand in {
-        "setup", "login", "whoami", "logout", "create", "ls", "inspect", "rm"
+        "setup", "login", "whoami", "logout", "create", "ls", "inspect", "rm", "exec"
     }:
         return
     try:
         if mode() == "hosted":
             raise AccountError("HOSTED_VMS_UNAVAILABLE",
                                "This hosted command is not available yet. "
-                               "Use create, ls, inspect, or rm.")
+                               "Use create, ls, inspect, rm, or exec.")
     except AccountError as exc:
         fail(exc)
 
@@ -268,21 +269,56 @@ def run(
 
 @app.command()
 def exec(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Sandbox name."),
     cmd: list[str] = typer.Argument(None, help="Command after `--`."),
     region: str | None = typer.Option(None, "--region"),
+    cwd: str | None = typer.Option(None, "--cwd", help="Guest working directory."),
+    env: list[str] | None = typer.Option(None, "--env", help="Guest KEY=VALUE; repeatable."),
+    timeout: float | None = typer.Option(
+        None, "--timeout", min=0.001, help="Command timeout in seconds."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Return exit code and base64 output."),
 ) -> None:
     """Execute a command in a running sandbox."""
     if not cmd:
         _fail("provide a command after `--`, e.g. vmnest exec app -- python -c 'print(1)'")
+    environment = {}
+    for item in env or []:
+        key, separator, value = item.partition("=")
+        if not separator or not key or "\x00" in item:
+            _fail("--env must be KEY=VALUE.")
+        environment[key] = value
+
+    def output(result):
+        if as_json:
+            import base64
+            typer.echo(json.dumps({
+                "exit_code": result.exit_code, "encoding": "base64",
+                "stdout": base64.b64encode(result.stdout).decode("ascii"),
+                "stderr": base64.b64encode(result.stderr).decode("ascii"),
+            }))
+            if result.exit_code:
+                raise typer.Exit(result.exit_code)
+        else:
+            _print_exec(result)
+
+    result = hosted_execute(
+        ctx, name, cmd, cwd=cwd, env=environment or None, timeout=timeout, as_json=as_json
+    )
+    if result is not None:
+        output(result)
+        return
     rec = _require_record(name)
 
     async def _do() -> None:
         sandbox = await Sandbox.attach(
             name, rec.microvm_id, endpoint=rec.endpoint, region=region or rec.region
         )
-        result = await sandbox.exec(cmd[0], cmd[1:])
-        _print_exec(result)
+        result = await sandbox.exec(
+            cmd[0], cmd[1:], cwd=cwd, env=environment or None, timeout=timeout
+        )
+        output(result)
 
     _guard(_do())
 

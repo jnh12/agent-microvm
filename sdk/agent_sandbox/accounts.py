@@ -131,12 +131,14 @@ class AccountClient:
         token: str | None = None,
         body=None,
         request_key: str | None = None,
+        timeout: float | None = 20,
     ):
         headers = {"Authorization": "Bearer " + token} if token else {}
         if request_key:
             headers["Idempotency-Key"] = request_key
         try:
-            with httpx.Client(timeout=20, follow_redirects=False) as client:
+            transport_timeout = httpx.Timeout(timeout, connect=20, write=20, pool=20)
+            with httpx.Client(timeout=transport_timeout, follow_redirects=False) as client:
                 response = client.request(method, self.url + path, headers=headers, json=body)
             if response.status_code >= 300:
                 try:
@@ -156,6 +158,13 @@ class AccountClient:
                     "Use vmnest login --device for the device-code fallback.",
                     "PROVIDER_UNAVAILABLE": "GitHub is unavailable. Try again shortly.",
                     "VM_NOT_FOUND": "VM not found in your account.",
+                    "VM_NOT_READY": "VM is not ready for execution. Check vmnest inspect.",
+                    "EXEC_TIMEOUT_LIMIT": "Requested timeout exceeds the service limit.",
+                    "EXEC_TIMED_OUT": "Command exceeded its execution timeout.",
+                    "EXEC_FAILED": "The guest could not execute the command.",
+                    "EXEC_OUTCOME_UNKNOWN": (
+                        "Connection lost; command may have run. Do not retry blindly."
+                    ),
                     "VM_LIMIT_REACHED": (
                         "Your active VM limit is reached. Terminate a VM before creating another."
                     ),

@@ -14,6 +14,10 @@ class ControlPlaneError(SandboxError):
 class AgentError(SandboxError):
     """Raised when the in-VM guest agent (``agentd``) returns an error."""
 
+    def __init__(self, message: str, *, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
+
 
 class SandboxTimeoutError(SandboxError):
     """Raised when a sandbox does not reach the expected state in time."""

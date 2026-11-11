@@ -1,5 +1,6 @@
 """Hosted lifecycle routing for the existing CLI commands."""
 
+import base64
 import json
 import os
 import time
@@ -11,6 +12,38 @@ import typer
 from agent_sandbox.accounts import AccountClient, AccountError, mode, service_url
 
 from .accounts import fail
+
+
+def execute(ctx, name, command, *, cwd=None, env=None, timeout=None, as_json=False):
+    """Thin hosted transport. Commands are never automatically retried."""
+    try:
+        if mode() != "hosted":
+            return None
+        if getattr(ctx.get_parameter_source("region"), "name", None) == "COMMANDLINE":
+            raise AccountError("HOSTED_OPTION_UNSUPPORTED", "Region is service-managed.")
+        from agent_sandbox.models import ExecResult
+
+        body = {"command": command[0], "args": command[1:], "cwd": cwd, "env": env}
+        if timeout is not None:
+            body["timeout"] = timeout
+        try:
+            result = AccountClient(service_url()).authenticated(
+                "POST", "/v1/vms/" + quote(name, safe="") + "/exec", body=body, timeout=None
+            )
+        except AccountError as exc:
+            if exc.code == "SERVICE_UNAVAILABLE":
+                raise AccountError(
+                    "EXEC_OUTCOME_UNKNOWN",
+                    "Connection lost; command may have run. Do not retry blindly.",
+                ) from None
+            raise
+        return ExecResult(
+            result["exit_code"],
+            base64.b64decode(result["stdout"]),
+            base64.b64decode(result["stderr"]),
+        )
+    except AccountError as exc:
+        fail(exc, as_json)
 
 
 def route(ctx, action, *, name=None, request_key=None, as_json=False):

@@ -166,8 +166,11 @@ def create(
         False, "--egress", "-e",
         help="Attach the egress connector from infra outputs.",
     ),
+    request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Create and start a named sandbox."""
+    if request_key:
+        _fail("--request-key applies only to remote mode")
     image_arn = _resolve_image(image)
     role_arn = _resolve_role(role)
     egress_connectors = _resolve_egress_connectors(egress_connector, egress)
@@ -212,8 +215,11 @@ def run(
         False, "--egress", "-e",
         help="Attach the egress connector from infra outputs.",
     ),
+    request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Boot an ephemeral sandbox, run a command, then terminate it."""
+    if request_key:
+        _fail("--request-key applies only to remote mode")
     if not cmd:
         _fail("provide a command after `--`, e.g. vmnest run <arn> -- python -c 'print(1)'")
     role_arn = _resolve_role(role)
@@ -245,8 +251,11 @@ def exec(
     name: str = typer.Argument(..., help="Sandbox name."),
     cmd: list[str] = typer.Argument(None, help="Command after `--`."),
     region: str | None = typer.Option(None, "--region"),
+    request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Execute a command in a running sandbox."""
+    if request_key:
+        _fail("--request-key applies only to remote mode")
     if not cmd:
         _fail("provide a command after `--`, e.g. vmnest exec app -- python -c 'print(1)'")
     rec = _require_record(name)

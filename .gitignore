@@ -18,6 +18,7 @@ uv.lock
 *.db
 *.db-wal
 *.db-shm
+*.db.lock
 
 # VHS tapes used to record the demo GIFs in demo/ (local only)
 .demo/

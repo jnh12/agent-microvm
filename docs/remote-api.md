@@ -87,17 +87,37 @@ The direct and remote paths share observability functions and the forwarding pro
 
 ## Failure behavior
 
-The database reserves names before launch and stores the AWS identity before waiting
-for readiness. Duplicate names fail instead of launching another VM. The shared SDK
-uses a stable client token across launch retries. HTTP requests are never automatically
-replayed. An error can mean the operation completed but its response was lost; inspect
-before retrying.
+Creation persists the name, original region, launch parameters, and a generated AWS
+client token before calling AWS. Saved VM identities survive restarts. Deletion intent
+is persisted before termination; failed deletions retry in the background. Interrupted
+`run` VMs with known IDs are terminated on restart. Running commands are never resumed
+or automatically executed again. Recovery skips currently active `run` requests.
 
-This is deliberately not a durable job scheduler. If the server dies during creation,
-a `CREATING` record without an ID may need manual AWS inspection. If it dies during
-`run`, its cleanup cannot execute; check AWS and terminate the VM manually. Unresolved
-reservations are retained rather than silently launching replacements. Normal command
-failures and live-request disconnects do not depend on client-side cleanup. Keep the
-SQLite file across server restarts. Concurrent requests cannot reuse a reserved name.
+Recovery runs at startup and periodically. Set `VMNEST_RECOVERY_INTERVAL_SECONDS`
+(default 5, any finite positive number) to change the polling interval. It adds no
+VM lifetime or usage limit. An OS file lock allows only one API process per database;
+do not start multiple uvicorn workers or use separate databases for replicas. The lock
+is released automatically if the process crashes. Existing databases migrate in place.
+
+`create`, `exec`, and `run` accept `--request-key` before `--`. The CLI generates a key
+if omitted and prints it on operational failure. HTTP bodies use `request_key`.
+Retry with the same key and original input to retrieve a completed operation. An
+incomplete execution returns `OUTCOME_UNKNOWN` and is not run again. A key reused for
+different input returns `REQUEST_CONFLICT`. A create replay cannot recreate a terminated
+VM; use a new key to intentionally create another. Terminated records are retained for
+safe replay but hidden from `ls`; names can be reused with a new key. Delete is repeatable
+while that name still identifies the same VM. After name reuse, it targets the new VM.
+
+Completed execution results are cached in the local SQLite database, including command
+output, which may contain secrets. Keep the database private. Command inputs are compared
+using a hash rather than stored verbatim. There is currently no automatic history pruning.
+
+There is one deliberately conservative boundary: if a crash or lost AWS response occurs
+after launch starts but before its VM ID is saved, recovery marks it `UNKNOWN`. AWS's VM
+lookup does not return the client token, so this version cannot reliably identify that
+VM automatically. It neither guesses nor relaunches; manual AWS reconciliation is still
+required. A reservation persisted before launch started can safely resume using its
+stored configuration. Transport failures remain uncertain; inspect before making a new
+request with a different key. Keep the SQLite file across restarts.
 
 Run tests with `pip install -e ".[dev,api]"` followed by `pytest tests -q`.

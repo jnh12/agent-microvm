@@ -2,6 +2,7 @@
 
 import base64
 import functools
+import uuid
 from pathlib import Path
 
 from agent_sandbox.errors import SandboxError
@@ -17,6 +18,7 @@ def routed(function):
         from .main import _fail, _print_exec, console
 
         operation = function.__name__
+        key = kwargs.get("request_key") or str(uuid.uuid4())
         try:
             for option in ("role", "region", "egress_connector", "egress", "log_group"):
                 if kwargs.get(option):
@@ -28,7 +30,9 @@ def routed(function):
             name = kwargs.get("name")
             path = vm_path(name) if name else "/v1/vms"
             if operation == "create":
-                result = request("POST", "/v1/vms", {"name": name})
+                result = request("POST", "/v1/vms", {"name": name, "request_key": key})
+                if not result.get("id"):
+                    raise SandboxError(f"Creation is {result['state']}; inspect before proceeding")
                 console.print(f"created {name} ({result['id']})")
                 return
             if operation in {"exec", "run"}:
@@ -36,7 +40,9 @@ def routed(function):
                 if not cmd:
                     raise SandboxError("Provide a command after --")
                 endpoint = "/v1/run" if operation == "run" else path + "/exec"
-                result = request("POST", endpoint, {"command": cmd[0], "args": cmd[1:]})
+                result = request(
+                    "POST", endpoint, {"command": cmd[0], "args": cmd[1:], "request_key": key}
+                )
                 _print_exec(
                     ExecResult(
                         result["exit_code"],
@@ -80,6 +86,11 @@ def routed(function):
             else:
                 raise SandboxError("This operation is not available through the remote API")
         except SandboxError as exc:
+            if operation in {"create", "run", "exec"}:
+                _fail(
+                    f"{exc}\nRequest key: {key}. "
+                    f"Reuse --request-key {key} to check the same operation."
+                )
             _fail(str(exc))
 
     return wrapper

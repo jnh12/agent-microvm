@@ -15,6 +15,9 @@ uv.lock
 
 # Local sandbox state
 .agent_sandbox/
+*.db
+*.db-wal
+*.db-shm
 
 # VHS tapes used to record the demo GIFs in demo/ (local only)
 .demo/

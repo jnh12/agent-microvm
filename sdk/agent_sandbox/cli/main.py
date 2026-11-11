@@ -20,6 +20,7 @@ from agent_sandbox.errors import SandboxError
 from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
+from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
@@ -36,6 +37,15 @@ infra_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(infra_app)
+register_files(app)
+
+
+@app.callback()
+def mode_guard(ctx: typer.Context):
+    from agent_sandbox.remote import remote_url
+    if remote_url() and ctx.invoked_subcommand in {"infra", "image", "mcp"}:
+        raise typer.BadParameter("This command is direct-only; unset VMNEST_API_URL")
+
 
 console = Console()
 err_console = Console(stderr=True)
@@ -141,6 +151,7 @@ def _print_exec(result) -> None:
 
 
 @app.command()
+@routed
 def create(
     name: str = typer.Argument(..., help="Sandbox name."),
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
@@ -186,6 +197,7 @@ def create(
 
 
 @app.command()
+@routed
 def run(
     image: str = typer.Argument(..., help="MicroVM image ARN."),
     cmd: list[str] = typer.Argument(None, help="Command after `--`."),
@@ -228,6 +240,7 @@ def run(
 
 
 @app.command()
+@routed
 def exec(
     name: str = typer.Argument(..., help="Sandbox name."),
     cmd: list[str] = typer.Argument(None, help="Command after `--`."),
@@ -249,6 +262,7 @@ def exec(
 
 
 @app.command()
+@routed
 def stop(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -265,6 +279,7 @@ def stop(
 
 
 @app.command()
+@routed
 def start(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -290,6 +305,7 @@ def start(
 
 
 @app.command()
+@routed
 def rm(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -310,6 +326,7 @@ def rm(
 
 
 @app.command()
+@routed
 def ls(region: str | None = typer.Option(None, "--region")) -> None:
     """List all locally tracked sandboxes and their live status."""
     records = StateStore().all()
@@ -336,6 +353,7 @@ def ls(region: str | None = typer.Option(None, "--region")) -> None:
 
 
 @app.command()
+@routed
 def ps(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -352,6 +370,7 @@ def ps(
 
 
 @app.command()
+@routed
 def inspect(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -368,6 +387,7 @@ def inspect(
 
 
 @app.command()
+@routed
 def logs(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -381,6 +401,7 @@ def logs(
 
 
 @app.command()
+@routed
 def metrics(
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
@@ -693,6 +714,10 @@ def _websocket_handshake_and_relay(
 
 
 def _require_record(name: str) -> SandboxRecord:
+    from agent_sandbox.remote import remote_url, request, vm_path
+    if remote_url():
+        row = request("GET", vm_path(name))
+        return SandboxRecord(name, row["id"], row.get("endpoint"), region=row.get("region"))
     try:
         return StateStore().require(name)
     except KeyError as exc:
@@ -708,53 +733,22 @@ def _guard(coro) -> None:
 
 
 def _print_cw_logs(rec: SandboxRecord, region: str | None, log_group: str | None) -> None:
-    import boto3
-    from botocore.exceptions import BotoCoreError, ClientError
-
-    group = log_group or f"/aws/lambda-microvms/{rec.microvm_id}"
-    client = boto3.client("logs", region_name=region)
+    from agent_sandbox.observability import read_logs
     try:
-        streams = client.describe_log_streams(
-            logGroupName=group, orderBy="LastEventTime", descending=True, limit=1
-        ).get("logStreams", [])
-        if not streams:
-            console.print(f"no log streams in {group}")
-            return
-        events = client.get_log_events(
-            logGroupName=group, logStreamName=streams[0]["logStreamName"]
-        ).get("events", [])
-        for event in events:
+        for event in read_logs(rec.microvm_id, region, log_group):
             console.out(event.get("message", ""), end="")
-    except (ClientError, BotoCoreError) as exc:
-        _fail(f"could not read logs from {group}: {exc}")
+    except Exception as exc:
+        _fail(f"could not read logs: {exc}")
 
 
 def _print_cw_metrics(rec: SandboxRecord, region: str | None) -> None:
-    import datetime as dt
-
-    import boto3
-    from botocore.exceptions import BotoCoreError, ClientError
-
-    client = boto3.client("cloudwatch", region_name=region)
-    end = dt.datetime.now(dt.UTC)
-    start = end - dt.timedelta(minutes=30)
+    from agent_sandbox.observability import read_metrics
     table = Table("METRIC", "LATEST")
     try:
-        for metric in ("CPUUtilization", "MemoryUtilization"):
-            resp = client.get_metric_statistics(
-                Namespace="AWS/LambdaMicroVMs",
-                MetricName=metric,
-                Dimensions=[{"Name": "MicrovmId", "Value": rec.microvm_id}],
-                StartTime=start,
-                EndTime=end,
-                Period=60,
-                Statistics=["Average"],
-            )
-            points = sorted(resp.get("Datapoints", []), key=lambda p: p["Timestamp"])
-            latest = f"{points[-1]['Average']:.1f}" if points else "-"
-            table.add_row(metric, latest)
+        for metric, value in read_metrics(rec.microvm_id, region).items():
+            table.add_row(metric, f"{value:.1f}" if value is not None else "-")
         console.print(table)
-    except (ClientError, BotoCoreError) as exc:
+    except Exception as exc:
         _fail(f"could not read metrics: {exc}")
 
 
@@ -1021,6 +1015,19 @@ def forward(
         )
 
     async def _setup() -> tuple[str, ControlPlane]:
+        from agent_sandbox.remote import ForwardConnection, remote_url
+        if remote_url():
+            if region or no_verify_tls:
+                _fail("Remote forwarding uses backend region and verified TLS")
+            cp = ForwardConnection(name)
+            info = await cp.get_microvm(rec.microvm_id)
+            token["value"] = await _mint(cp)
+            endpoint = info.endpoint
+            if not endpoint:
+                _fail("VM has no endpoint")
+            if not endpoint.startswith(("http://", "https://")):
+                endpoint = "https://" + endpoint
+            return endpoint.rstrip("/"), cp
         sandbox = await Sandbox.attach(
             name, rec.microvm_id, endpoint=rec.endpoint,
             region=region or rec.region, verify_tls=verify,

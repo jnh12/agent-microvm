@@ -4,6 +4,9 @@
 
 # agent-microvm
 
+Development branch: [single-user remote API](docs/remote-api.md), using the same
+SDK as direct mode. Provision infrastructure separately; no accounts are required.
+
 **Isolated AWS microVM sandboxes for AI agents.**
 
 SDK · CLI · MCP server · AWS microVMs

@@ -9,7 +9,16 @@ from .errors import SandboxError
 
 
 def remote_url():
-    return os.environ.get("VMNEST_API_URL", "").rstrip("/")
+    from .accounts import AccountError, mode, normalize_url, service_url
+
+    try:
+        if os.environ.get("VMNEST_MODE") == "self-hosted":
+            return ""
+        if os.environ.get("VMNEST_API_URL"):
+            return normalize_url(os.environ["VMNEST_API_URL"])
+        return service_url() if mode() == "hosted" else ""
+    except AccountError as exc:
+        raise SandboxError(str(exc)) from None
 
 
 def request(method, path, body=None):
@@ -17,9 +26,19 @@ def request(method, path, body=None):
     parsed = urlsplit(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise SandboxError("Set VMNEST_API_URL to the backend URL")
+    from .accounts import AccountError, secret
+
+    try:
+        token = secret(url, "session")
+    except AccountError as exc:
+        raise SandboxError(str(exc)) from None
+    if not token:
+        raise SandboxError("Sign in with vmnest login before using remote VMs")
     try:
         with httpx.Client(timeout=httpx.Timeout(None, connect=10), trust_env=False) as client:
-            response = client.request(method, url + path, json=body)
+            response = client.request(
+                method, url + path, json=body, headers={"Authorization": "Bearer " + token}
+            )
         if response.is_error:
             raise SandboxError(f"Remote operation failed ({response.status_code}): {response.text}")
         return response.json()

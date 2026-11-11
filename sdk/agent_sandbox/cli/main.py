@@ -20,6 +20,7 @@ from agent_sandbox.errors import SandboxError
 from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
+from .accounts import register as register_accounts
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
 
@@ -38,13 +39,19 @@ infra_app = typer.Typer(
 )
 app.add_typer(infra_app)
 register_files(app)
+register_accounts(app)
 
 
 @app.callback()
 def mode_guard(ctx: typer.Context):
     from agent_sandbox.remote import remote_url
-    if remote_url() and ctx.invoked_subcommand in {"infra", "image", "mcp"}:
-        raise typer.BadParameter("This command is direct-only; unset VMNEST_API_URL")
+    if ctx.invoked_subcommand in {"setup", "login", "whoami", "logout"}:
+        return
+    try:
+        if remote_url() and ctx.invoked_subcommand in {"infra", "image", "mcp"}:
+            raise typer.BadParameter("This command is direct-only; select self-hosted mode")
+    except SandboxError as exc:
+        _fail(str(exc))
 
 
 console = Console()

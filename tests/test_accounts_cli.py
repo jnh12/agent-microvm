@@ -26,15 +26,15 @@ def test_self_hosted_requires_no_account_or_credential_store(monkeypatch):
     monkeypatch.setattr(accounts, "credential_store", lambda: pytest.fail("keyring accessed"))
     runner = CliRunner()
     assert runner.invoke(app, ["setup", "--mode", "self-hosted", "--json"]).exit_code == 0
-    result = runner.invoke(app, ["auth", "status", "--json"])
+    result = runner.invoke(app, ["whoami", "--json"])
     assert json.loads(result.output)["authentication"] == "not_required"
     assert runner.invoke(app, ["infra", "--help"]).exit_code == 0
 
 
-def test_hosted_blocks_every_vm_command_before_aws(monkeypatch):
+def test_hosted_blocks_unimplemented_commands_before_aws(monkeypatch):
     accounts.save_config({"mode": "hosted", "url": "https://accounts.example.com"})
     runner = CliRunner()
-    for command in ["create", "run", "ls", "infra", "image", "mcp", "rm", "exec"]:
+    for command in ["run", "infra", "image", "mcp", "exec", "stop", "start"]:
         result = runner.invoke(app, [command])
         assert result.exit_code == 1 and "HOSTED_VMS_UNAVAILABLE" in result.output
     from agent_sandbox_mcp.server import build_server
@@ -117,7 +117,7 @@ def test_mode_override_conflict_does_not_switch_routes(monkeypatch):
 
 def test_corrupt_config_is_an_actionable_error():
     accounts.config_path().write_text("not json")
-    result = CliRunner().invoke(app, ["auth", "status", "--json"])
+    result = CliRunner().invoke(app, ["whoami", "--json"])
     assert result.exit_code == 1
     assert json.loads(result.output)["error"]["code"] == "CONFIG_INVALID"
 

@@ -21,6 +21,7 @@ from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
+from .hosted import route as hosted_route
 from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
@@ -59,13 +60,15 @@ def entry(ctx: typer.Context):
                    "  Self-hosted: vmnest setup --mode self-hosted\n"
                    "Run vmnest --help for commands.")
         return
-    if ctx.invoked_subcommand in {"setup", "login", "whoami", "auth", "logout", "doctor"}:
+    if ctx.invoked_subcommand in {
+        "setup", "login", "whoami", "logout", "create", "ls", "inspect", "rm"
+    }:
         return
     try:
         if mode() == "hosted":
             raise AccountError("HOSTED_VMS_UNAVAILABLE",
-                               "Hosted accounts are ready; hosted VM operations are not available "
-                               "yet. For AWS, run vmnest setup --mode self-hosted.")
+                               "This hosted command is not available yet. "
+                               "Use create, ls, inspect, or rm.")
     except AccountError as exc:
         fail(exc)
 
@@ -171,6 +174,7 @@ def _print_exec(result) -> None:
 
 @app.command()
 def create(
+    ctx: typer.Context,
     name: str = typer.Argument(..., help="Sandbox name."),
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
     cpus: int = typer.Option(1, "--cpus", help="vCPU count."),
@@ -184,8 +188,14 @@ def create(
         False, "--egress", "-e",
         help="Attach the egress connector from infra outputs.",
     ),
+    request_key: str | None = typer.Option(None, "--request-key", help="Hosted retry key."),
+    as_json: bool = typer.Option(False, "--json", help="Structured hosted output."),
 ) -> None:
     """Create and start a named sandbox."""
+    if hosted_route(ctx, "create", name=name, request_key=request_key, as_json=as_json):
+        return
+    if request_key or as_json:
+        _fail("--request-key and --json are available in hosted mode for this command.")
     image_arn = _resolve_image(image)
     role_arn = _resolve_role(role)
     egress_connectors = _resolve_egress_connectors(egress_connector, egress)
@@ -320,10 +330,16 @@ def start(
 
 @app.command()
 def rm(
+    ctx: typer.Context,
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
+    as_json: bool = typer.Option(False, "--json", help="Structured hosted output."),
 ) -> None:
-    """Terminate a sandbox and remove it from local state."""
+    """Terminate a sandbox in your selected mode."""
+    if hosted_route(ctx, "rm", name=name, as_json=as_json):
+        return
+    if as_json:
+        _fail("--json is available in hosted mode for this command.")
     rec = _require_record(name)
 
     async def _do() -> None:
@@ -339,8 +355,16 @@ def rm(
 
 
 @app.command()
-def ls(region: str | None = typer.Option(None, "--region")) -> None:
-    """List all locally tracked sandboxes and their live status."""
+def ls(
+    ctx: typer.Context,
+    region: str | None = typer.Option(None, "--region"),
+    as_json: bool = typer.Option(False, "--json", help="Structured hosted output."),
+) -> None:
+    """List your hosted or locally tracked sandboxes."""
+    if hosted_route(ctx, "ls", as_json=as_json):
+        return
+    if as_json:
+        _fail("--json is available in hosted mode for this command.")
     records = StateStore().all()
     if not records:
         console.print("no sandboxes")
@@ -382,10 +406,14 @@ def ps(
 
 @app.command()
 def inspect(
+    ctx: typer.Context,
     name: str = typer.Argument(...),
     region: str | None = typer.Option(None, "--region"),
+    as_json: bool = typer.Option(False, "--json", help="Structured hosted output."),
 ) -> None:
     """Print detailed MicroVM info as JSON."""
+    if hosted_route(ctx, "inspect", name=name, as_json=as_json):
+        return
     rec = _require_record(name)
 
     async def _do() -> None:

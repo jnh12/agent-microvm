@@ -94,7 +94,7 @@ def credential_store():
     if not type(backend).__module__.startswith(allowed):
         raise AccountError(
             "CREDENTIAL_STORE_UNAVAILABLE",
-            "An OS credential store is required. Run vmnest doctor for details.",
+            "Unlock an OS credential store, then run vmnest login.",
         )
     return backend
 
@@ -123,8 +123,18 @@ class AccountClient:
     def __init__(self, url: str):
         self.url = normalize_url(url)
 
-    def request(self, method: str, path: str, *, token: str | None = None, body=None):
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        token: str | None = None,
+        body=None,
+        request_key: str | None = None,
+    ):
         headers = {"Authorization": "Bearer " + token} if token else {}
+        if request_key:
+            headers["Idempotency-Key"] = request_key
         try:
             with httpx.Client(timeout=20, follow_redirects=False) as client:
                 response = client.request(method, self.url + path, headers=headers, json=body)
@@ -145,6 +155,13 @@ class AccountClient:
                     "LOGIN_NOT_CONFIGURED": "The server needs GitHub login configured. "
                     "Use vmnest login --device for the device-code fallback.",
                     "PROVIDER_UNAVAILABLE": "GitHub is unavailable. Try again shortly.",
+                    "VM_NOT_FOUND": "VM not found in your account.",
+                    "VM_LIMIT_REACHED": (
+                        "One active VM is allowed. Terminate it before creating another."
+                    ),
+                    "REQUEST_CONFLICT": "This request key belongs to another VM name.",
+                    "HOSTED_VMS_UNAVAILABLE": "The server has not enabled hosted VMs.",
+                    "INVALID_REQUEST": "Invalid request. Check the name and supported options.",
                 }
                 if code not in messages:
                     code = "SERVICE_ERROR"
@@ -154,7 +171,10 @@ class AccountClient:
             raise AccountError("SERVICE_UNAVAILABLE", "Cannot reach the account service.") from None
 
     def account(self):
+        return self.authenticated("GET", "/v1/account")
+
+    def authenticated(self, method, path, **kwargs):
         token = secret(self.url, "session")
         if not token:
             raise AccountError("AUTH_REQUIRED", "Sign in with vmnest login.")
-        return self.request("GET", "/v1/account", token=token)
+        return self.request(method, path, token=token, **kwargs)

@@ -5,7 +5,8 @@
 # agent-microvm
 
 Development preview: [hosted accounts and CLI setup](docs/accounts.md).
-This branch adds GitHub account login; hosted VM operations are not available yet.
+This branch adds GitHub account login and account-owned hosted `create`, `ls`,
+`inspect`, and `rm`. Other hosted operations are not implemented yet.
 
 **Isolated AWS microVM sandboxes for AI agents.**
 

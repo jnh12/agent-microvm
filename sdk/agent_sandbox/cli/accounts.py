@@ -114,9 +114,6 @@ def browser_url(pending, origin):
 
 
 def register(app: typer.Typer):
-    auth = typer.Typer(help="Inspect hosted authentication.", no_args_is_help=True)
-    app.add_typer(auth, name="auth")
-
     @app.command()
     @handled
     def setup(
@@ -276,13 +273,7 @@ def register(app: typer.Typer):
     @app.command()
     @handled
     def whoami(as_json: bool = typer.Option(False, "--json")):
-        """Verify the current session with the account service."""
-        emit({"ok": True, "account": AccountClient(service_url()).account()}, as_json)
-
-    @auth.command("status")
-    @handled
-    def status(as_json: bool = typer.Option(False, "--json")):
-        """Check mode and hosted identity without exposing credentials."""
+        """Show mode and verify your hosted account, if selected."""
         selected = mode()
         if selected != "hosted":
             emit(
@@ -290,7 +281,7 @@ def register(app: typer.Typer):
                     "ok": True,
                     "mode": selected or "unconfigured",
                     "authentication": "not_required" if selected else "not_configured",
-                    "next_command": "vmnest setup" if not selected else None,
+                    "next_command": None if selected else "vmnest setup",
                 },
                 as_json,
             )
@@ -323,40 +314,3 @@ def register(app: typer.Typer):
             secret(origin, "session", delete=True)
         secret(origin, "pending", delete=True)
         emit({"ok": True, "status": "signed_out"}, as_json)
-
-    @app.command()
-    @handled
-    def doctor(as_json: bool = typer.Option(False, "--json")):
-        """Check setup and authentication without changing infrastructure."""
-        selected = mode()
-        if not selected:
-            raise AccountError("MODE_REQUIRED", "Run vmnest setup to choose a mode.")
-        if selected == "self-hosted":
-            import boto3
-            from botocore.exceptions import BotoCoreError, ClientError
-
-            try:
-                identity = boto3.client("sts").get_caller_identity()
-            except (BotoCoreError, ClientError):
-                raise AccountError(
-                    "AWS_AUTH_REQUIRED", "Configure AWS credentials, then run vmnest doctor."
-                ) from None
-            emit({"ok": True, "mode": selected, "aws_account": identity["Account"]}, as_json)
-            return
-        origin = service_url()
-        health = AccountClient(origin).request("GET", "/healthz")
-        if health.get("service") != "vmnest-accounts":
-            raise AccountError("SERVICE_INVALID", "URL is not a VMNest accounts service.")
-        credential_store()
-        user = AccountClient(origin).account()
-        emit(
-            {
-                "ok": True,
-                "mode": selected,
-                "service": "reachable",
-                "credential_store": "available",
-                "account": user,
-                "hosted_vms": "not_available_yet",
-            },
-            as_json,
-        )

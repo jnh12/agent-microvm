@@ -20,13 +20,15 @@ from agent_sandbox.errors import SandboxError
 from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
+from .accounts import register as register_accounts
 from .state import SandboxRecord, StateStore
 
 app = typer.Typer(
     name="vmnest",
     help="agent-microvm: isolated microVM sandboxes on AWS Lambda MicroVMs.",
-    no_args_is_help=True,
+    no_args_is_help=False,
     add_completion=False,
+    pretty_exceptions_show_locals=False,
 )
 image_app = typer.Typer(name="image", help="Manage MicroVM images.", no_args_is_help=True)
 app.add_typer(image_app)
@@ -39,6 +41,33 @@ app.add_typer(infra_app)
 
 console = Console()
 err_console = Console(stderr=True)
+
+
+register_accounts(app)
+
+
+@app.callback(invoke_without_command=True)
+def entry(ctx: typer.Context):
+    """Use hosted accounts or self-hosted AWS."""
+    from agent_sandbox.accounts import AccountError, mode
+
+    from .accounts import fail
+
+    if ctx.invoked_subcommand is None:
+        typer.echo("Welcome to VMNest. Choose your route:\n"
+                   "  Hosted:      vmnest setup --mode hosted --url https://YOUR-ACCOUNT-SERVICE\n"
+                   "  Self-hosted: vmnest setup --mode self-hosted\n"
+                   "Run vmnest --help for commands.")
+        return
+    if ctx.invoked_subcommand in {"setup", "login", "whoami", "auth", "logout", "doctor"}:
+        return
+    try:
+        if mode() == "hosted":
+            raise AccountError("HOSTED_VMS_UNAVAILABLE",
+                               "Hosted accounts are ready; hosted VM operations are not available "
+                               "yet. For AWS, run vmnest setup --mode self-hosted.")
+    except AccountError as exc:
+        fail(exc)
 
 
 def _run(coro):

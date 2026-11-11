@@ -39,6 +39,12 @@ INSTRUCTIONS = (
 
 
 def build_server() -> FastMCP:
+    from agent_sandbox.accounts import AccountError, mode
+
+    if mode() == "hosted":
+        raise AccountError(
+            "HOSTED_VMS_UNAVAILABLE", "Hosted MCP VM operations are not available yet."
+        )
     config = load_config()
     registry = SandboxRegistry(config)
 

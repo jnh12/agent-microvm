@@ -1,6 +1,6 @@
 [project]
 name = "vmnest"
-version = "0.1.3.dev3"
+version = "0.1.3.dev4"
 description = "Embeddable Python SDK + CLI for isolated microVM sandboxes on AWS Lambda MicroVMs (a Python fork of microsandbox concepts)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,7 +21,6 @@ Repository = "https://github.com/jnh12/agent-microvm"
 Issues = "https://github.com/jnh12/agent-microvm/issues"
 
 [project.optional-dependencies]
-api = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
 # Infra ships in the core dependencies now; this extra is kept as a no-op so
 # `pip install vmnest[infra]` continues to resolve.
 infra = []
@@ -42,7 +41,6 @@ dev = [
 ]
 
 [project.scripts]
-vmnest-api = "agent_sandbox.api:main"
 vmnest = "agent_sandbox.cli.main:app"
 vmnest-mcp = "agent_sandbox_mcp.server:main"
 

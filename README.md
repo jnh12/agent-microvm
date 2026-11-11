@@ -4,8 +4,8 @@
 
 # agent-microvm
 
-Development branch: [single-user remote API](docs/remote-api.md), using the same
-SDK as direct mode. Provision infrastructure separately; no accounts are required.
+Development branch: [remote CLI setup](docs/remote-api.md). The separate
+`vmnest-service` repository owns the HTTP backend and its deployment infrastructure.
 
 **Isolated AWS microVM sandboxes for AI agents.**
 

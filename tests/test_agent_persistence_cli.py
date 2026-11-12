@@ -29,3 +29,22 @@ def test_checkpoint_restore_and_status_are_http_only(monkeypatch):
     assert calls[-1][2]["terminate"] is False
     assert runner.invoke(app, ["agent", "checkpoint-status", "op"]).exit_code == 0
     assert calls[-1][:2] == ("GET", "/v1/agent-state-operations/op")
+
+
+def test_create_disposable_transports_flag(monkeypatch):
+    calls = []
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+
+    def request(method, path, body=None):
+        calls.append(body)
+        return {"id": "vm", "state": "RUNNING", "disposable": body.get("disposable", False)}
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    runner = CliRunner()
+    result = runner.invoke(app, ["create", "scratch", "--agent", "codex", "--disposable", "--json"])
+    assert result.exit_code == 0, result.output
+    assert calls[-1]["disposable"] is True
+    assert calls[-1]["agent"] == "codex"
+    result = runner.invoke(app, ["create", "saved", "--agent", "claude"])
+    assert result.exit_code == 0, result.output
+    assert "disposable" not in calls[-1]

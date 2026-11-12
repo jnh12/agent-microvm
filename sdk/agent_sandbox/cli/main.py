@@ -166,6 +166,10 @@ def _print_exec(result) -> None:
 @app.command()
 @routed
 def create(
+    disposable: bool = typer.Option(
+        False, "--disposable",
+        help="Disable hosted agent checkpoints; discard VM files on termination. Self-hosted VMs are already disposable.",
+    ),
     prompt: str | None = typer.Option(None, "--prompt"),
     prompt_file: Path | None = typer.Option(None, "--prompt-file"),
     as_json: bool = typer.Option(False, "--json"),

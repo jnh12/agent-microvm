@@ -3,7 +3,6 @@ import io
 import json
 import threading
 
-import pytest
 from agent_sandbox.cli import agent_runs, chat
 from agent_sandbox.cli.main import app
 from prompt_toolkit.application import create_app_session
@@ -15,54 +14,15 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
-@pytest.mark.parametrize("prefix", [[], ["agent"]])
-def test_workspace_table_and_explicit_json(monkeypatch, prefix):
-    monkeypatch.setenv("VMNEST_MODE", "hosted")
-    monkeypatch.setenv("VMNEST_API_URL", "https://example.test")
-    response = {
-        "items": [
-            {
-                "id": "workspace-id",
-                "name": "dev",
-                "checkpoint": "saved",
-                "operation": {"kind": "save", "phase": "failed", "error": "Upload failed"},
-            }
-        ]
-    }
-    monkeypatch.setattr("agent_sandbox.cli.agent_persistence.api", lambda *a: response)
-    human = runner.invoke(app, [*prefix, "workspaces"])
-    assert human.exit_code == 0, human.output
-    assert "Workspaces" in human.output and "dev" in human.output
-    assert "Upload failed" in human.output and '"items"' not in human.output
-    structured = runner.invoke(app, [*prefix, "workspaces", "--json"])
-    assert json.loads(structured.output) == response
-
-
 def test_inspect_default_and_json(monkeypatch):
     monkeypatch.setenv("VMNEST_MODE", "hosted")
     monkeypatch.setenv("VMNEST_API_URL", "https://example.test")
     response = {"name": "dev", "state": "RUNNING", "agent": {"provider": "claude"}}
     monkeypatch.setattr("agent_sandbox.cli.remote.request", lambda *a: response)
     human = runner.invoke(app, ["inspect", "dev"])
-    assert human.exit_code == 0 and "VM details" in human.output
+    assert human.exit_code == 0 and "Computer" in human.output
     assert "claude" in human.output and '"state"' not in human.output
     assert json.loads(runner.invoke(app, ["inspect", "dev", "--json"]).output) == response
-
-
-def test_checkpoint_failure_is_readable_and_fails(monkeypatch):
-    monkeypatch.setenv("VMNEST_MODE", "hosted")
-    monkeypatch.setenv("VMNEST_API_URL", "https://example.test")
-    monkeypatch.setattr(
-        "agent_sandbox.cli.agent_persistence.api",
-        lambda *a: {
-            "id": "operation-id",
-            "phase": "failed",
-            "error": "Previous checkpoint retained",
-        },
-    )
-    result = runner.invoke(app, ["checkpoint-status", "operation-id"])
-    assert result.exit_code == 1
-    assert "Previous checkpoint retained" in result.output and '"phase"' not in result.output
 
 
 def test_renderer_deltas_and_completed_only_reply():
@@ -160,3 +120,41 @@ def test_prompt_preserves_draft_during_output_and_multiline():
                 assert await asyncio.wait_for(task, 3) == "draft\ncontinued"
 
     asyncio.run(exercise())
+
+
+def test_open_and_list_keep_physical_lifecycle_out_of_human_output(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "https://example.test")
+    row = {"name": "dev", "id": "physical-secret-id", "state": "TERMINATED", "status": "sleeping"}
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", lambda *a: {"items": [row]})
+    human = runner.invoke(app, ["ls"])
+    assert human.exit_code == 0, human.output
+    assert "dev" in human.output and "sleeping" in human.output
+    assert "TERMINATED" not in human.output and "physical-secret-id" not in human.output
+    assert json.loads(runner.invoke(app, ["ls", "--json"]).output) == {"items": [row]}
+    calls = []
+
+    def request(*args):
+        calls.append(args)
+        return {**row, "status": "ready", "state": "RUNNING"}
+
+    monkeypatch.setattr("agent_sandbox.cli.computers.request", request)
+    opened = runner.invoke(app, ["open", "dev"])
+    assert opened.exit_code == 0 and "ready" in opened.output, opened.output
+    assert calls == [("POST", "/v1/vms/dev/open")]
+    assert "physical-secret-id" not in opened.output
+
+
+def test_create_idle_option_is_transported(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "https://example.test")
+    calls = []
+
+    def request(method, path, body):
+        calls.append(body)
+        return {"name": "dev", "id": "test", "state": "RUNNING"}
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    result = runner.invoke(app, ["create", "dev", "--idle-minutes", "0"])
+    assert result.exit_code == 0, result.output
+    assert calls[0]["idle_minutes"] == 0

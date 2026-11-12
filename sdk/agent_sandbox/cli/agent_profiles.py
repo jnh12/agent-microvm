@@ -15,9 +15,14 @@ app = typer.Typer(name="profile", help="Manage account-owned agent integration p
 
 
 def api(method, path, body=None):
-    timeout = float(os.environ.get("VMNEST_DISCOVERY_TIMEOUT_SECONDS", "150"))
+    setting, default = (
+        ("VMNEST_COMPUTER_TIMEOUT_SECONDS", "240")
+        if method == "POST" and path.startswith("/v1/vms/")
+        else ("VMNEST_DISCOVERY_TIMEOUT_SECONDS", "150")
+    )
+    timeout = float(os.environ.get(setting, default))
     if not 0 < timeout < float("inf"):
-        raise AccountError("INVALID_REQUEST", "Discovery timeout must be finite and positive.")
+        raise AccountError("INVALID_REQUEST", "Request timeout must be finite and positive.")
     return AccountClient(service_url()).authenticated(method, path, body=body, timeout=timeout)
 
 

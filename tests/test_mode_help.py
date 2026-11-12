@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 from agent_sandbox.cli.main import app
@@ -18,10 +19,14 @@ def test_root_switches_without_mutation(monkeypatch):
     for selected in ("hosted", "self-hosted", "hosted"):
         text = help_text(monkeypatch, selected)
         assert "create" in text and "upload" in text and "setup" in text
-        for name in ("agent", "project", "usage", "checkpoint", "login"):
-            assert (f" {name} " in text) == (selected == "hosted")
+        for name in ("agent", "project", "usage", "open", "login"):
+            assert (re.search(r"\u2502\s+" + re.escape(name) + r"\s{2,}", text) is not None) == (
+                selected == "hosted"
+            )
         for name in ("infra", "image", "mcp"):
-            assert (f" {name} " in text) == (selected == "self-hosted")
+            assert (re.search(r"\u2502\s+" + re.escape(name) + r"\s{2,}", text) is not None) == (
+                selected == "self-hosted"
+            )
 
 
 @pytest.mark.parametrize("selected", ["hosted", "self-hosted"])
@@ -37,6 +42,7 @@ def test_options(monkeypatch, selected):
         "--disposable",
         "--json",
         "--request-key",
+        "--idle-minutes",
     ]
     direct = ["--region", "--role", "--image", "--cpus", "--memory", "--egress"]
     for flag in hosted:
@@ -74,7 +80,7 @@ def test_saved_mode_and_offline_help(monkeypatch):
 
 @pytest.mark.parametrize(
     "selected,command",
-    [("hosted", "infra"), ("self-hosted", "agent"), ("self-hosted", "checkpoint")],
+    [("hosted", "infra"), ("self-hosted", "agent"), ("self-hosted", "open")],
 )
 def test_mode_errors(monkeypatch, selected, command):
     monkeypatch.setenv("VMNEST_MODE", selected)
@@ -89,3 +95,20 @@ def test_environment_override(monkeypatch):
     assert " infra " not in runner.invoke(app, ["--help"]).output
     assert " infra " in help_text(monkeypatch, "self-hosted")
     assert "default" in help_text(monkeypatch, "hosted", "run")
+
+
+def test_explicit_state_management_removed(monkeypatch):
+    text = help_text(monkeypatch, "hosted")
+    for command in (
+        "checkpoint",
+        "checkpoint-status",
+        "restore",
+        "workspaces",
+        "start",
+        "stop",
+        "rm",
+    ):
+        assert re.search(r"\u2502\s+" + re.escape(command) + r"\s{2,}", text) is None
+    text = help_text(monkeypatch, "hosted", "agent")
+    for command in ("checkpoint", "checkpoint-status", "restore", "workspaces"):
+        assert command not in text

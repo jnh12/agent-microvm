@@ -22,8 +22,8 @@ from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
+from .computers import register as register_computers
 from .agent_connections import app as agent_app
-from .agent_persistence import register as register_persistence
 from .mode_help import ModeApp, ModeGroup, selected_mode, unavailable
 from .output import details
 from .projects import app as project_app
@@ -52,7 +52,7 @@ app.add_typer(infra_app)
 register_files(app)
 register_accounts(app)
 register_usage(app)
-register_persistence(app, agent_prefix=False)
+register_computers(app)
 
 
 @app.callback()
@@ -174,6 +174,7 @@ def _print_exec(result) -> None:
 @app.command()
 @routed
 def create(
+    idle_minutes: float | None = typer.Option(None, "--idle-minutes", min=0, help="Hosted idle shutdown; default 15 minutes, 0 keeps awake."),
     repository: str | None = typer.Option(
         None, "--repo", help="HTTPS Git repository to clone into /workspace/project."
     ),
@@ -186,7 +187,7 @@ def create(
     disposable: bool = typer.Option(
         False,
         "--disposable",
-        help="Disable hosted checkpoints; discard VM files on termination. "
+        help="Discard this computer and its files when it shuts down. "
         "Self-hosted VMs are already disposable.",
     ),
     prompt: str | None = typer.Option(None, "--prompt"),
@@ -214,6 +215,8 @@ def create(
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Create and start a named sandbox."""
+    if idle_minutes is not None:
+        _fail("--idle-minutes requires hosted mode")
     if prompt is not None or prompt_file is not None:
         _fail("Agent prompts apply only to remote mode")
     if repository or setup_command:
@@ -391,10 +394,16 @@ def rm(
 
 @app.command()
 @routed
-def ls(region: str | None = typer.Option(None, "--region")) -> None:
-    """List all locally tracked sandboxes and their live status."""
+def ls(
+    region: str | None = typer.Option(None, "--region"),
+    as_json: bool = typer.Option(False, "--json"),
+) -> None:
+    """List your computers and their status."""
     records = StateStore().all()
     if not records:
+        if as_json:
+            console.print_json(data={"items": []})
+            return
         console.print("no sandboxes")
         return
 
@@ -408,10 +417,15 @@ def ls(region: str | None = typer.Option(None, "--region")) -> None:
 
     async def _do() -> None:
         table = Table("NAME", "MICROVM ID", "STATUS", "ENDPOINT")
+        items = []
         for rec in records:
             status = await _status(rec)
             table.add_row(rec.name, rec.microvm_id, status, rec.endpoint or "-")
-        console.print(table)
+            items.append({"name": rec.name, "id": rec.microvm_id, "state": status, "endpoint": rec.endpoint})
+        if as_json:
+            console.print_json(data={"items": items})
+        else:
+            console.print(table)
 
     _guard(_do())
 
@@ -1086,8 +1100,8 @@ def forward(
             if region or no_verify_tls:
                 _fail("Remote forwarding uses backend region and verified TLS")
             cp = ForwardConnection(name)
-            info = await cp.get_microvm(rec.microvm_id)
             token["value"] = await _mint(cp)
+            info = await cp.get_microvm(rec.microvm_id)
             endpoint = info.endpoint
             if not endpoint:
                 _fail("VM has no endpoint")

@@ -175,6 +175,8 @@ def run_chat(name, session, history):
     )
     prompt = make_prompt(lambda: observer.status) if terminal else None
     console.print(f"VMNest · {name} · {session}", style="bold cyan", markup=False)
+    with console.status("Opening computer..."):
+        api("POST", "/v1/vms/" + quote(name, safe="") + "/open")
     console.print("/help for commands. /exit or Ctrl+D leaves remote work running.", style="dim")
     # Validate the connection before opening input; do not leave a broken prompt behind.
     observer.poll()

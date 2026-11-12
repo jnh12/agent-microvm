@@ -17,7 +17,6 @@ def routed(function):
         if not remote_url():
             return function(*args, **kwargs)
         from .main import _fail, _print_exec, console
-        from .output import details
 
         operation = function.__name__
         key = kwargs.get("request_key") or str(uuid.uuid4())
@@ -40,7 +39,7 @@ def routed(function):
                         raise SandboxError("--prompt requires --agent")
                     text = prompt_text(kwargs.get("prompt"), kwargs.get("prompt_file"))
                 body = {"name": name, "request_key": key}
-                for field in ("repository", "setup_command"):
+                for field in ("repository", "setup_command", "idle_minutes"):
                     if kwargs.get(field) is not None:
                         body[field] = kwargs[field]
                 if kwargs.get("approvals"):
@@ -96,7 +95,7 @@ def routed(function):
                 if kwargs.get("as_json"):
                     console.print_json(data=result)
                 else:
-                    console.print(f"created {name} ({result['id']})")
+                    console.print(f"Created {name}. Use vmnest open {name} or vmnest exec {name} -- COMMAND.", markup=False)
                     if result.get("run"):
                         console.print(f"Run {result['run']['id']}: {result['run']['status']}")
                 return
@@ -126,16 +125,23 @@ def routed(function):
             elif operation in {"inspect", "ps"}:
                 result = request("GET", path)
                 if operation == "inspect":
-                    details(result, kwargs.get("as_json", False), "VM details")
+                    from .computers import present
+
+                    present(result, kwargs.get("as_json", False))
                 else:
-                    console.print(f"{name}: {result['state']} ({result['id']})")
+                    console.print(f"{name}: {result.get('status', result['state'])}")
             elif operation == "ls":
                 from rich.table import Table
 
-                table = Table("NAME", "MICROVM ID", "STATUS", "ENDPOINT")
-                for row in request("GET", path)["items"]:
+                result = request("GET", path)
+                if kwargs.get("as_json"):
+                    console.print_json(data=result)
+                    return
+                table = Table("COMPUTER", "TYPE", "STATUS")
+                for row in result["items"]:
                     table.add_row(
-                        row["name"], row["id"] or "-", row["state"], row.get("endpoint") or "-"
+                        row["name"], (row.get("agent") or {}).get("provider", "Computer"),
+                        row.get("status", row["state"]).replace("_", " ")
                     )
                 console.print(table)
             elif operation == "logs":

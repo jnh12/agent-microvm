@@ -933,22 +933,27 @@ Retries must reuse `--request-key`. Polling/events support structured JSON and
 saved account connections. These commands require the corresponding service
 update; adding the CLI alone does not enable them on an older hosted deployment.
 
-Hosted agent persistence: `vmnest agent checkpoint NAME --terminate --wait` saves before shutdown; `vmnest agent restore NAME --wait` restores into a fresh VM. Use `vmnest agent workspaces` and `vmnest agent checkpoint-status OPERATION` to inspect saved workspaces and operations. Requires a hosted API with persistence configured.
+Hosted computers and agents keep their names, workspace files, and conversations.
+Create once, then use `vmnest open NAME`, `vmnest exec NAME -- COMMAND`, or
+`vmnest agent chat NAME` whenever you return. They wake automatically if needed.
+After 15 minutes idle, the service saves before shutting down compute. Active agent
+work, guest background jobs, and connection leases keep it awake.
 
-To opt out of hosted persistence: `vmnest create scratch --agent codex --disposable` (or `--agent claude`). Disposable VMs skip checkpoints and lose guest state on termination; they do not auto-terminate after a prompt.
+`vmnest create dev --idle-minutes 30` changes the idle interval; `0` disables
+service-managed idle shutdown. `--disposable` discards guest state on shutdown.
+Files in `/workspace` and `/home/agent` persist; RAM, running processes, and system
+changes outside these folders do not. Use saved `--setup` for system dependencies.
+Checkpoint, restore, and workspace-management commands are no longer part of the CLI.
 
-Hosted agent runs default to unrestricted provider execution. Use `vmnest create careful --agent claude --approvals` (or Codex) to enable permission prompts. Sudo-enabled images grant passwordless sudo inside the VM in either mode.
-
-Hosted regular VMs now support the same workspace persistence: `vmnest checkpoint NAME --terminate --wait`, `vmnest restore NAME --wait`, `vmnest workspaces`, and `vmnest checkpoint-status OPERATION`. Regular VMs automatically checkpoint `/workspace` on a configurable interval; `vmnest create NAME --disposable` opts out. The `agent`-prefixed checkpoint commands remain supported.
-
+Hosted agents have unrestricted provider execution by default. `--approvals` opts
+into permission prompts; sudo-enabled images retain passwordless sudo either way.
 
 ### Hosted saved projects
 
 ```sh
 vmnest create dev --agent codex --repo https://github.com/octocat/Hello-World.git --setup "sudo apt-get update && sudo apt-get install -y jq" --prompt "Explain this project"
 vmnest project logs dev
-vmnest checkpoint dev --terminate --wait
-vmnest restore dev --wait
+vmnest open dev
 vmnest agent chat dev
 ```
 
@@ -957,22 +962,20 @@ currently require public HTTPS URLs. Setup runs once on each new or restored VM;
 use idempotent commands to recreate system dependencies while preserving workspace
 files. Inspect the VM for setup status. `vmnest project retry dev` explicitly retries
 a failed setup; interrupted setup requires reconciliation. `--disposable` opts out
-of checkpoints. The CLI delegates these operations to the hosted HTTP API.
+of persistence. The CLI delegates these operations to the hosted HTTP API.
 
 CLI help follows the selected mode (`vmnest setup --mode hosted` or `--mode self-hosted`), including options within shared commands. Before setup, help shows both routes. Help reads local configuration only and requires no sign-in or network access.
 
 
 ### Terminal output and chat
 
-Workspace lists, checkpoint progress, VM inspection, project retries, agent
-sessions/runs/profiles/connections, and infrastructure outputs use readable
-summaries or tables by default. Use `--json` for scripts; checkpoint commands
-with `--wait --json` emit one JSON object per progress update. For example:
+Computer lists, inspection, project retries, agent sessions/runs/profiles/connections,
+and infrastructure outputs use readable summaries or tables. Use `--json` for scripts.
 
 ```sh
-vmnest workspaces
-vmnest workspaces --json
-vmnest inspect dev
+vmnest ls
+vmnest ls --json
+vmnest open dev
 vmnest inspect dev --json
 vmnest agent chat dev
 ```

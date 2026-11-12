@@ -14,12 +14,9 @@ HOSTED = {
     "usage",
     "agent",
     "project",
-    "checkpoint",
-    "checkpoint-status",
-    "restore",
-    "workspaces",
+    "open",
 }
-DIRECT = {"infra", "image", "mcp"}
+DIRECT = {"infra", "image", "mcp", "start", "stop", "rm"}
 DIRECT_OPTIONS = {
     "region",
     "role",
@@ -41,6 +38,7 @@ HOSTED_CREATE_OPTIONS = {
     "repository",
     "setup_command",
     "as_json",
+    "idle_minutes",
 }
 
 

@@ -12,12 +12,14 @@ from agent_sandbox.cli.accounts import handled
 from agent_sandbox.cli.agent_profiles import api, select
 from agent_sandbox.cli.agent_profiles import app as profiles_app
 
+from .agent_persistence import register as register_persistence
 from .agent_runs import register as register_runs
 
 app = typer.Typer(name="agent", help="Manage saved agent account connections.")
 app.add_typer(profiles_app, name="profile")
 
 register_runs(app)
+register_persistence(app)
 Provider = Literal["codex", "claude"]
 
 

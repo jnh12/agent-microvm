@@ -932,3 +932,5 @@ Retries must reuse `--request-key`. Polling/events support structured JSON and
 `logs --after CURSOR` resumes output. `agent status` without a VM still reports
 saved account connections. These commands require the corresponding service
 update; adding the CLI alone does not enable them on an older hosted deployment.
+
+Hosted agent persistence: `vmnest agent checkpoint NAME --terminate --wait` saves before shutdown; `vmnest agent restore NAME --wait` restores into a fresh VM. Use `vmnest agent workspaces` and `vmnest agent checkpoint-status OPERATION` to inspect saved workspaces and operations. Requires a hosted API with persistence configured.

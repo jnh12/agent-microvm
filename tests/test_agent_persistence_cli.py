@@ -88,3 +88,50 @@ def test_top_level_workspace_commands(monkeypatch):
     assert calls[-1][1] == "/v1/vms/normal/restore"
     assert runner.invoke(app, ["workspaces"]).exit_code == 0
     assert runner.invoke(app, ["checkpoint-status", "op"]).exit_code == 0
+
+
+def test_create_project_options(monkeypatch):
+    calls = []
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+
+    def request(method, path, body=None):
+        calls.append(body)
+        return {"id": "vm", "state": "RUNNING"}
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    result = CliRunner().invoke(
+        app,
+        [
+            "create",
+            "dev",
+            "--repo",
+            "https://github.com/octocat/Hello-World.git",
+            "--setup",
+            "npm install",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert calls[-1]["repository"] == "https://github.com/octocat/Hello-World.git"
+    assert calls[-1]["setup_command"] == "npm install"
+
+
+def test_prompt_wait_exits_if_vm_stops_during_setup(monkeypatch):
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    calls = []
+
+    def request(method, path, body=None):
+        calls.append((method, path))
+        return {
+            "id": "vm",
+            "state": "RUNNING" if method == "POST" else "TERMINATED",
+            "project": {"setup_status": "running"},
+        }
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    result = CliRunner().invoke(
+        app, ["create", "dev", "--agent", "codex", "--setup", "sleep 10", "--prompt", "hello"]
+    )
+    assert result.exit_code != 0
+    assert "VM stopped before project setup completed" in result.output
+    assert len(calls) == 2

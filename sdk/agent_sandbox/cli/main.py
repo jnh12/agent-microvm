@@ -7,10 +7,10 @@ control plane. Named sandboxes are tracked in a local :class:`StateStore`.
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 import json
 import os
 import secrets
+from pathlib import Path
 
 import typer
 from rich.console import Console
@@ -23,10 +23,11 @@ from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
 from .agent_connections import app as agent_app
+from .agent_persistence import register as register_persistence
+from .projects import app as project_app
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
 from .usage import register as register_usage
-from .agent_persistence import register as register_persistence
 
 app = typer.Typer(
     name="vmnest",
@@ -38,6 +39,7 @@ image_app = typer.Typer(name="image", help="Manage MicroVM images.", no_args_is_
 app.add_typer(image_app)
 
 app.add_typer(agent_app)
+app.add_typer(project_app, name="project")
 infra_app = typer.Typer(
     name="infra",
     help="Deploy/manage MicroVM infrastructure from sandbox.yaml.",
@@ -168,18 +170,28 @@ def _print_exec(result) -> None:
 @app.command()
 @routed
 def create(
+    repository: str | None = typer.Option(
+        None, "--repo", help="HTTPS Git repository to clone into /workspace/project."
+    ),
+    setup_command: str | None = typer.Option(
+        None, "--setup", help="Saved shell command to prepare each fresh or restored VM."
+    ),
     approvals: bool = typer.Option(
         False, "--approvals", help="Require provider approval prompts for hosted agent actions."
     ),
     disposable: bool = typer.Option(
-        False, "--disposable",
-        help="Disable hosted checkpoints; discard VM files on termination. Self-hosted VMs are already disposable.",
+        False,
+        "--disposable",
+        help="Disable hosted checkpoints; discard VM files on termination. "
+        "Self-hosted VMs are already disposable.",
     ),
     prompt: str | None = typer.Option(None, "--prompt"),
     prompt_file: Path | None = typer.Option(None, "--prompt-file"),
     as_json: bool = typer.Option(False, "--json"),
     name: str = typer.Argument(..., help="Sandbox name."),
-    profile: str | None = typer.Option(None, "--profile", help="Saved hosted Codex integration profile."),
+    profile: str | None = typer.Option(
+        None, "--profile", help="Saved hosted Codex integration profile."
+    ),
     agent: str | None = typer.Option(None, "--agent", help="Hosted agent image: codex or claude."),
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
     cpus: int = typer.Option(1, "--cpus", help="vCPU count."),
@@ -190,7 +202,9 @@ def create(
         None, "--egress-connector", help="Egress network connector ARN to attach."
     ),
     egress: bool = typer.Option(
-        False, "--egress", "-e",
+        False,
+        "--egress",
+        "-e",
         help="Attach the egress connector from infra outputs.",
     ),
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
@@ -198,6 +212,8 @@ def create(
     """Create and start a named sandbox."""
     if prompt is not None or prompt_file is not None:
         _fail("Agent prompts apply only to remote mode")
+    if repository or setup_command:
+        _fail("--repo and --setup currently require hosted mode")
     if approvals:
         _fail("--approvals applies only to hosted agent mode")
     if profile:

@@ -39,6 +39,9 @@ def routed(function):
                         raise SandboxError("--prompt requires --agent")
                     text = prompt_text(kwargs.get("prompt"), kwargs.get("prompt_file"))
                 body = {"name": name, "request_key": key}
+                for field in ("repository", "setup_command"):
+                    if kwargs.get(field) is not None:
+                        body[field] = kwargs[field]
                 if kwargs.get("approvals"):
                     if not kwargs.get("agent"):
                         raise SandboxError("--approvals requires --agent")
@@ -57,6 +60,26 @@ def routed(function):
                 if not result.get("id"):
                     raise SandboxError(f"Creation is {result['state']}; inspect before proceeding")
                 if text is not None:
+                    import time
+
+                    from .agent_runs import poll_interval
+
+                    while result.get("project") and result["project"]["setup_status"] in (
+                        "pending",
+                        "running",
+                    ):
+                        if result["state"] != "RUNNING":
+                            raise SandboxError(
+                                "VM stopped before project setup completed; "
+                                "inspect it before retrying"
+                            )
+                        time.sleep(poll_interval())
+                        result = request("GET", path)
+                    if result.get("project") and result["project"]["setup_status"] != "ready":
+                        raise SandboxError(
+                            "VM was created but project setup needs attention; "
+                            "inspect it and use vmnest project logs"
+                        )
                     try:
                         result["run"] = submit(
                             name,

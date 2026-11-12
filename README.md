@@ -940,3 +940,21 @@ To opt out of hosted persistence: `vmnest create scratch --agent codex --disposa
 Hosted agent runs default to unrestricted provider execution. Use `vmnest create careful --agent claude --approvals` (or Codex) to enable permission prompts. Sudo-enabled images grant passwordless sudo inside the VM in either mode.
 
 Hosted regular VMs now support the same workspace persistence: `vmnest checkpoint NAME --terminate --wait`, `vmnest restore NAME --wait`, `vmnest workspaces`, and `vmnest checkpoint-status OPERATION`. Regular VMs automatically checkpoint `/workspace` on a configurable interval; `vmnest create NAME --disposable` opts out. The `agent`-prefixed checkpoint commands remain supported.
+
+
+### Hosted saved projects
+
+```sh
+vmnest create dev --agent codex --repo https://github.com/octocat/Hello-World.git --setup "sudo apt-get update && sudo apt-get install -y jq" --prompt "Explain this project"
+vmnest project logs dev
+vmnest checkpoint dev --terminate --wait
+vmnest restore dev --wait
+vmnest agent chat dev
+```
+
+Repository/setup options also work with Claude and ordinary hosted VMs. Repositories
+currently require public HTTPS URLs. Setup runs once on each new or restored VM;
+use idempotent commands to recreate system dependencies while preserving workspace
+files. Inspect the VM for setup status. `vmnest project retry dev` explicitly retries
+a failed setup; interrupted setup requires reconciliation. `--disposable` opts out
+of checkpoints. The CLI delegates these operations to the hosted HTTP API.

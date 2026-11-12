@@ -73,7 +73,7 @@ def test_interactive_selection_and_default_configuration(api):
     assert api[-1][2]["integrations"] == ["gh", "mail"]
     response = runner.invoke(app, ["configure", "--all-integrations", "--json"])
     assert response.exit_code == 0, response.output
-    assert api[-1] == ("PATCH", "/v1/agent-connections/codex", {"integrations": ["gh", "mail"]})
+    assert api[-1] == ("PATCH", "/v1/agent-connections/codex", {"integrations": "all"})
 
 
 def test_codex_connect_requires_explicit_unattended_selection_before_upload(
@@ -117,3 +117,19 @@ def test_claude_profile_routes_to_provider(api):
     assert result.exit_code == 0, result.output
     assert api[0][1] == "/v1/agent-connections/claude/integrations"
     assert api[-1][2]["provider"] == "claude"
+
+
+@pytest.mark.parametrize("provider", ["codex", "claude"])
+def test_all_is_persistent_mode_without_inventory_snapshot(api, provider):
+    result = CliRunner().invoke(
+        app,
+        ["profile", "create", "everything", "--provider", provider, "--all-integrations", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    assert api == [
+        (
+            "POST",
+            "/v1/agent-profiles",
+            {"name": "everything", "provider": provider, "integrations": "all"},
+        )
+    ]

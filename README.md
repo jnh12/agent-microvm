@@ -874,7 +874,7 @@ Apache-2.0 — see [LICENSE](LICENSE).
 
 #### Codex integration defaults and profiles
 
-Interactive `vmnest agent connect --provider codex` now asks which connected account apps to enable. Unattended callers must specify repeated `--integration NAME_OR_ID`, `--all-integrations`, or `--no-integrations`; `--all-integrations` saves today's explicit selection, not access to future additions. Reconnecting resets defaults to none before selection. Existing VMs retain their saved selection.
+Interactive `vmnest agent connect --provider codex` now asks which connected account apps to enable. Unattended callers must specify repeated `--integration NAME_OR_ID`, `--all-integrations`, or `--no-integrations`; `--all-integrations` saves a persistent all-connections mode, including future account connections for both Codex and Claude. Reconnecting resets defaults to none before selection. Existing VMs retain their saved selection.
 
 ```sh
 vmnest agent integrations --json
@@ -901,3 +901,9 @@ vmnest create work --agent claude --profile mail
 
 Selections affect future VMs. `agent profile update` uses the profile's saved
 provider. Unattended connects require `--yes` and an explicit integration selection.
+
+`integrations: "all"` is the API representation for all-connections mode; an array
+is an explicit selection and `[]` means none. Existing saved arrays remain fixed
+selections; rerun configure/profile update with `--all-integrations` to opt in.
+Agent sessions discover additions according to the provider runtime, usually on
+the next session startup. This does not enable plugin or skill syncing.

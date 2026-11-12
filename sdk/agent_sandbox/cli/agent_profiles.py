@@ -38,17 +38,20 @@ def select(
         raise AccountError(
             "SELECTION_REQUIRED", "Specify --integration, --all-integrations, or --no-integrations."
         )
+    if all_integrations:
+        return "all"
     items = api("GET", f"/v1/agent-connections/{provider}/integrations")["items"]
     available = [item for item in items if item["available"]]
-    if all_integrations:
-        return [item["id"] for item in available]
     if integrations is None:
         for index, item in enumerate(available, 1):
             typer.echo(f"{index}. {item['name']}")
         if not available:
-            typer.echo("No available account integrations; saving an empty selection.")
-            return []
-        answer = typer.prompt("Enable integrations by name or number, comma-separated; or 'none'")
+            typer.echo("No available integrations yet; choose all for future connections or none.")
+        answer = typer.prompt(
+            "Enable integrations by name or number, comma-separated; or 'all' / 'none'"
+        )
+        if answer.strip().lower() == "all":
+            return "all"
         if answer.strip().lower() == "none":
             return []
         integrations = [part.strip() for part in answer.split(",")]
@@ -80,7 +83,14 @@ def emit(result, as_json):
         for item in items:
             typer.echo(
                 f"{item['name']}: "
-                + (", ".join(item.get("integrations", [])) or item.get("status", "no integrations"))
+                + (
+                    "all connections (including future connections)"
+                    if item.get("integrations") == "all"
+                    else (
+                        ", ".join(item.get("integrations", []))
+                        or item.get("status", "no integrations")
+                    )
+                )
             )
         if not items:
             typer.echo("No saved profiles.")

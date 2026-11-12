@@ -867,6 +867,25 @@ Apache-2.0 — see [LICENSE](LICENSE).
 
 ### Hosted agent logins
 
-`vmnest agent connect` discovers supported local, OS-keychain, and WSL logins and lets you select a provider/source. Use `--provider codex --source local --yes` for unattended setup, and `--replace` to reconnect. `vmnest agent status --json` shows cloud connection metadata; `vmnest agent disconnect --provider codex` removes it.
+`vmnest agent connect` discovers supported local, OS-keychain, and WSL logins and lets you select a provider/source. Use `--provider codex --source local --no-integrations --yes` for unattended setup, and `--replace` to reconnect. `vmnest agent status --json` shows cloud connection metadata; `vmnest agent disconnect --provider codex` removes it.
 
 `vmnest create NAME --agent codex` (or `claude`) requests the hosted agent image and automatic credential setup. These flags require a matching hosted service. Self-hosted users continue selecting their own `--image`. Agent credentials are installed for `/home/agent`; existing exec runs as root, so run the runtime as `runuser -u agent -- codex ...`. No agent chat/task commands are included.
+
+
+#### Codex integration defaults and profiles
+
+Interactive `vmnest agent connect --provider codex` now asks which connected account apps to enable. Unattended callers must specify repeated `--integration NAME_OR_ID`, `--all-integrations`, or `--no-integrations`; `--all-integrations` saves today's explicit selection, not access to future additions. Reconnecting resets defaults to none before selection. Existing VMs retain their saved selection.
+
+```sh
+vmnest agent integrations --json
+vmnest agent configure --integration github --integration gmail --json
+vmnest agent profile create dev --integration github --integration gmail --json
+vmnest agent profile list --json
+vmnest create my-dev --agent codex --profile dev
+vmnest agent profile update dev --integration github --json
+vmnest agent profile delete dev --json
+```
+
+Without `--profile`, new Codex VMs use connection defaults. Profile edits/deletion affect future launches, not existing VMs or retries of their creation request. Missing integrations fail before launch. These commands require the matching profile-capable service (SDK 0.1.3.dev8 / service 0.1.3); they are not available on older deployments.
+
+This version selects Codex account apps only. New Codex VMs disable standalone plugins/custom MCP plugin loading; Claude profile selection is not supported. Runtime configuration controls exposed tools, not the underlying account token's permissions. `VMNEST_DISCOVERY_TIMEOUT_SECONDS` sets the client's discovery timeout (150 seconds by default).

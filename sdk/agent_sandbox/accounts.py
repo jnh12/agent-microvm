@@ -138,12 +138,13 @@ class AccountClient:
         token: str | None = None,
         body=None,
         request_key: str | None = None,
+        timeout: float = 20,
     ):
         headers = {"Authorization": "Bearer " + token} if token else {}
         if request_key:
             headers["Idempotency-Key"] = request_key
         try:
-            with httpx.Client(timeout=20, follow_redirects=False) as client:
+            with httpx.Client(timeout=timeout, follow_redirects=False) as client:
                 response = client.request(method, self.url + path, headers=headers, json=body)
             if response.status_code >= 300:
                 try:
@@ -153,6 +154,14 @@ class AccountClient:
                     code = "SERVICE_ERROR"
                 # Avoid printing arbitrary provider/proxy responses or secrets.
                 messages = {
+                    "DISCOVERY_UNAVAILABLE": "Integration discovery is unavailable; retry later or contact the operator.",
+                    "CONNECTION_CHANGED": "The agent connection changed. Try again.",
+                    "AGENT_NOT_CONNECTED": "Connect your Codex account first.",
+                    "AGENT_RECONNECT_REQUIRED": "Reconnect the agent account with --replace.",
+                    "AGENT_REFRESH_PENDING": "Agent refresh is pending. Try again later.",
+                    "INTEGRATION_UNAVAILABLE": "A selected integration is unavailable. Check vmnest agent integrations.",
+                    "PROFILE_NOT_FOUND": "Agent profile not found.",
+                    "PROFILE_EXISTS": "Agent profile exists. Use profile update.",
                     "CONNECTION_EXISTS": "A connection is already saved. Use --replace to explicitly replace it.",
                     "INVALID_REQUEST": "Unsupported or invalid request data.",
                     "AUTH_REQUIRED": "Sign in with vmnest login.",

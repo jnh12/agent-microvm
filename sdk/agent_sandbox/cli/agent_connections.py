@@ -9,8 +9,11 @@ import typer
 
 from agent_sandbox.accounts import AccountClient, AccountError, service_url
 from agent_sandbox.cli.accounts import handled
+from agent_sandbox.cli.agent_profiles import api, select
+from agent_sandbox.cli.agent_profiles import app as profiles_app
 
 app = typer.Typer(name="agent", help="Manage saved agent account connections.")
+app.add_typer(profiles_app, name="profile")
 Provider = Literal["codex", "claude"]
 
 
@@ -80,6 +83,9 @@ def connect(
     credentials_file: Path | None = typer.Option(None, "--credentials-file"),
     as_json: bool = typer.Option(False, "--json"),
     source: str | None = typer.Option(None, "--source", help="local, keychain, or wsl:DISTRO"),
+    integration: list[str] | None = typer.Option(None, "--integration"),
+    all_integrations: bool = typer.Option(False, "--all-integrations"),
+    no_integrations: bool = typer.Option(False, "--no-integrations"),
 ):
     from .agent_discovery import discover
 
@@ -111,8 +117,25 @@ def connect(
                 credentials_file=None,
                 as_json=False,
                 source=source,
+                integration=integration,
+                all_integrations=all_integrations,
+                no_integrations=no_integrations,
             )
         return
+    if sum((bool(integration), all_integrations, no_integrations)) > 1:
+        raise AccountError("INVALID_REQUEST", "Choose one integration selection mode.")
+    if provider != "codex" and (integration or all_integrations or no_integrations):
+        raise AccountError(
+            "INVALID_REQUEST", "Integration selection currently supports Codex only."
+        )
+    if (
+        provider == "codex"
+        and (yes or as_json)
+        and not (integration or all_integrations or no_integrations)
+    ):
+        raise AccountError(
+            "SELECTION_REQUIRED", "Specify --integration, --all-integrations, or --no-integrations."
+        )
     if credentials_file:
         if source:
             raise AccountError("INVALID_SOURCE", "Use --source or --credentials-file, not both.")
@@ -141,6 +164,17 @@ def connect(
         f"/v1/agent-connections/{provider}",
         body={"credentials": payload, "replace": replace},
     )
+    if provider == "codex":
+        try:
+            chosen = select(integration, all_integrations, no_integrations, yes or as_json)
+            configured = api("PATCH", "/v1/agent-connections/codex", {"integrations": chosen})
+            result["integrations"] = configured["integrations"]
+        except AccountError as exc:
+            raise AccountError(
+                exc.code,
+                "Credentials were saved, but integration defaults were not updated. Use vmnest agent configure. "
+                + str(exc),
+            ) from None
     typer.echo(
         json.dumps(result)
         if as_json
@@ -175,3 +209,29 @@ def disconnect(
         if as_json
         else f"{provider}: cloud connection removed. Provider login has not been revoked."
     )
+
+
+@app.command()
+@handled
+def integrations(as_json: bool = typer.Option(False, "--json")):
+    result = api("GET", "/v1/agent-connections/codex/integrations")
+    if as_json:
+        typer.echo(json.dumps(result))
+    else:
+        for item in result["items"]:
+            typer.echo(
+                f"{item['name']} ({item['id']}): {'available' if item['available'] else 'unavailable'}"
+            )
+
+
+@app.command()
+@handled
+def configure(
+    integration: list[str] | None = typer.Option(None, "--integration"),
+    all_integrations: bool = typer.Option(False, "--all-integrations"),
+    no_integrations: bool = typer.Option(False, "--no-integrations"),
+    as_json: bool = typer.Option(False, "--json"),
+):
+    chosen = select(integration, all_integrations, no_integrations, as_json)
+    result = api("PATCH", "/v1/agent-connections/codex", {"integrations": chosen})
+    typer.echo(json.dumps(result) if as_json else "Codex defaults saved for future VMs.")

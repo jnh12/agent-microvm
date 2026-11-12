@@ -35,6 +35,10 @@ def routed(function):
                     if kwargs["agent"] not in {"codex", "claude"}:
                         raise SandboxError("--agent must be codex or claude")
                     body["agent"] = kwargs["agent"]
+                if kwargs.get("profile"):
+                    if kwargs.get("agent") != "codex":
+                        raise SandboxError("--profile requires --agent codex")
+                    body["profile"] = kwargs["profile"]
                 result = request("POST", "/v1/vms", body)
                 if not result.get("id"):
                     raise SandboxError(f"Creation is {result['state']}; inspect before proceeding")

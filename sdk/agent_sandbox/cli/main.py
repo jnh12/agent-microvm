@@ -166,6 +166,7 @@ def _print_exec(result) -> None:
 @routed
 def create(
     name: str = typer.Argument(..., help="Sandbox name."),
+    agent: str | None = typer.Option(None, "--agent", help="Hosted agent image: codex or claude."),
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
     cpus: int = typer.Option(1, "--cpus", help="vCPU count."),
     memory: int = typer.Option(512, "--memory", "-m", help="Memory in MB."),
@@ -181,6 +182,8 @@ def create(
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Create and start a named sandbox."""
+    if agent:
+        _fail("--agent applies only to remote mode; use --image for self-hosted images")
     if request_key:
         _fail("--request-key applies only to remote mode")
     image_arn = _resolve_image(image)

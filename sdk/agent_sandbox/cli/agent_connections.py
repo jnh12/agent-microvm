@@ -2,7 +2,6 @@
 
 import json
 import os
-import shutil
 from pathlib import Path
 from typing import Literal
 
@@ -24,11 +23,8 @@ def credential_path(provider):
     )
 
 
-def read_credentials(provider, path):
+def clean_credentials(provider, value):
     try:
-        if path.stat().st_size > 65536:
-            raise ValueError()
-        value = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(value, dict):
             raise ValueError()
         field = "tokens" if provider == "codex" else "claudeAiOauth"
@@ -56,10 +52,20 @@ def read_credentials(provider, path):
         if provider == "codex" and isinstance(value.get("last_refresh"), str):
             result["last_refresh"] = value["last_refresh"]
         return result
+    except (ValueError, TypeError):
+        raise AccountError(
+            "LOCAL_AUTH_UNAVAILABLE", "No supported subscription login found."
+        ) from None
+
+
+def read_credentials(provider, path):
+    try:
+        if path.stat().st_size > 65536:
+            raise ValueError()
+        return clean_credentials(provider, json.loads(path.read_text(encoding="utf-8")))
     except (OSError, ValueError, TypeError):
         raise AccountError(
-            "LOCAL_AUTH_UNAVAILABLE",
-            "No supported subscription credential file. OS-keychain and WSL discovery are not supported yet.",
+            "LOCAL_AUTH_UNAVAILABLE", "No supported subscription login found."
         ) from None
 
 
@@ -73,7 +79,10 @@ def connect(
     replace: bool = typer.Option(False, "--replace"),
     credentials_file: Path | None = typer.Option(None, "--credentials-file"),
     as_json: bool = typer.Option(False, "--json"),
+    source: str | None = typer.Option(None, "--source", help="local, keychain, or wsl:DISTRO"),
 ):
+    from .agent_discovery import discover
+
     url = service_url()
     if provider is None:
         if yes or as_json or credentials_file:
@@ -82,12 +91,9 @@ def connect(
             )
         candidates = []
         for name in ("codex", "claude"):
-            installed = shutil.which(name) is not None
-            path = credential_path(name)
-            typer.echo(
-                f"{name}: {'installed' if installed else 'not on PATH'}; credential file {'found' if path.is_file() else 'not found'}"
-            )
-            if installed and path.is_file():
+            found = discover(name, clean_credentials)
+            typer.echo(f"{name}: " + (", ".join(found) or "no supported login found"))
+            if found:
                 candidates.append(name)
         if not candidates:
             raise AccountError("LOCAL_AUTH_UNAVAILABLE", "No supported local agent login found.")
@@ -98,9 +104,31 @@ def connect(
         if any(name not in candidates for name in names):
             raise AccountError("INVALID_PROVIDER", "Select detected providers.")
         for name in names:
-            connect(provider=name, yes=False, replace=replace, credentials_file=None, as_json=False)
+            connect(
+                provider=name,
+                yes=False,
+                replace=replace,
+                credentials_file=None,
+                as_json=False,
+                source=source,
+            )
         return
-    payload = read_credentials(provider, credentials_file or credential_path(provider))
+    if credentials_file:
+        if source:
+            raise AccountError("INVALID_SOURCE", "Use --source or --credentials-file, not both.")
+        payload = read_credentials(provider, credentials_file)
+    else:
+        found = discover(provider, clean_credentials)
+        if source is None and len(found) == 1:
+            source = next(iter(found))
+        if source is None and found and not (yes or as_json):
+            source = typer.prompt("Choose login source (" + ", ".join(found) + ")")
+        if source not in found:
+            raise AccountError(
+                "LOCAL_AUTH_UNAVAILABLE",
+                "Choose an available --source: " + (", ".join(found) or "none"),
+            )
+        payload = found[source]
     if not yes:
         if as_json:
             raise AccountError("CONSENT_REQUIRED", "Use --yes to authorize credential upload.")

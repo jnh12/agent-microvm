@@ -30,7 +30,12 @@ def routed(function):
             name = kwargs.get("name")
             path = vm_path(name) if name else "/v1/vms"
             if operation == "create":
-                result = request("POST", "/v1/vms", {"name": name, "request_key": key})
+                body = {"name": name, "request_key": key}
+                if kwargs.get("agent"):
+                    if kwargs["agent"] not in {"codex", "claude"}:
+                        raise SandboxError("--agent must be codex or claude")
+                    body["agent"] = kwargs["agent"]
+                result = request("POST", "/v1/vms", body)
                 if not result.get("id"):
                     raise SandboxError(f"Creation is {result['state']}; inspect before proceeding")
                 console.print(f"created {name} ({result['id']})")

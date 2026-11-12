@@ -864,3 +864,9 @@ up a dev environment, run the tests and linter, and open a pull request.
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE).
+
+### Hosted agent logins
+
+`vmnest agent connect` discovers supported local, OS-keychain, and WSL logins and lets you select a provider/source. Use `--provider codex --source local --yes` for unattended setup, and `--replace` to reconnect. `vmnest agent status --json` shows cloud connection metadata; `vmnest agent disconnect --provider codex` removes it.
+
+`vmnest create NAME --agent codex` (or `claude`) requests the hosted agent image and automatic credential setup. These flags require a matching hosted service. Self-hosted users continue selecting their own `--image`. Agent credentials are installed for `/home/agent`; existing exec runs as root, so run the runtime as `runuser -u agent -- codex ...`. No agent chat/task commands are included.

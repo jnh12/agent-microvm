@@ -67,3 +67,24 @@ def test_create_approval_option(monkeypatch):
     assert result.exit_code == 0, result.output
     assert "approvals" not in calls[-1]
     assert runner.invoke(app, ["create", "invalid", "--approvals"]).exit_code != 0
+
+
+def test_top_level_workspace_commands(monkeypatch):
+    calls = []
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+
+    def api(method, path, body=None):
+        calls.append((method, path, body))
+        return {"id": "op", "phase": "completed"}
+
+    monkeypatch.setattr("agent_sandbox.cli.agent_persistence.api", api)
+    runner = CliRunner()
+    result = runner.invoke(app, ["checkpoint", "normal", "--terminate", "--wait"])
+    assert result.exit_code == 0, result.output
+    assert calls[-1][1] == "/v1/vms/normal/checkpoints"
+    assert calls[-1][2]["terminate"] is True
+    result = runner.invoke(app, ["restore", "normal", "--wait"])
+    assert result.exit_code == 0, result.output
+    assert calls[-1][1] == "/v1/vms/normal/restore"
+    assert runner.invoke(app, ["workspaces"]).exit_code == 0
+    assert runner.invoke(app, ["checkpoint-status", "op"]).exit_code == 0

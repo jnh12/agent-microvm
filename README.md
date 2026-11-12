@@ -938,3 +938,5 @@ Hosted agent persistence: `vmnest agent checkpoint NAME --terminate --wait` save
 To opt out of hosted persistence: `vmnest create scratch --agent codex --disposable` (or `--agent claude`). Disposable VMs skip checkpoints and lose guest state on termination; they do not auto-terminate after a prompt.
 
 Hosted agent runs default to unrestricted provider execution. Use `vmnest create careful --agent claude --approvals` (or Codex) to enable permission prompts. Sudo-enabled images grant passwordless sudo inside the VM in either mode.
+
+Hosted regular VMs now support the same workspace persistence: `vmnest checkpoint NAME --terminate --wait`, `vmnest restore NAME --wait`, `vmnest workspaces`, and `vmnest checkpoint-status OPERATION`. Regular VMs automatically checkpoint `/workspace` on a configurable interval; `vmnest create NAME --disposable` opts out. The `agent`-prefixed checkpoint commands remain supported.

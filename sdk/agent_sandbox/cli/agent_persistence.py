@@ -26,12 +26,12 @@ def display(result, wait):
         raise typer.Exit(1)
 
 
-def submit(name, action, request_key, terminate, wait):
+def submit(name, action, request_key, terminate, wait, agent_prefix=True):
     key = request_key or str(uuid.uuid4())
     try:
         result = api(
             "POST",
-            "/v1/vms/" + quote(name, safe="") + "/agent/" + action,
+            "/v1/vms/" + quote(name, safe="") + ("/agent/" if agent_prefix else "/") + action,
             {"request_key": key, "terminate": terminate},
         )
     except AccountError as exc:
@@ -41,7 +41,13 @@ def submit(name, action, request_key, terminate, wait):
     display({**result, "request_key": key}, wait)
 
 
-def register(app):
+def register(app, agent_prefix=True):
+    def require_hosted():
+        from agent_sandbox.remote import remote_url
+
+        if not agent_prefix and not remote_url():
+            raise AccountError("HOSTED_REQUIRED", "Workspace checkpoints require hosted mode.")
+
     @app.command("checkpoint")
     @handled
     def checkpoint(
@@ -51,7 +57,8 @@ def register(app):
         request_key: str | None = typer.Option(None, "--request-key"),
     ):
         """Save workspace and native conversations; optionally terminate after verification."""
-        submit(name, "checkpoints", request_key, terminate, wait)
+        require_hosted()
+        submit(name, "checkpoints", request_key, terminate, wait, agent_prefix)
 
     @app.command("restore")
     @handled
@@ -61,16 +68,19 @@ def register(app):
         request_key: str | None = typer.Option(None, "--request-key"),
     ):
         """Restore the latest checkpoint into a fresh VM under the same name."""
-        submit(name, "restore", request_key, False, wait)
+        require_hosted()
+        submit(name, "restore", request_key, False, wait, agent_prefix)
 
     @app.command("workspaces")
     @handled
     def workspaces():
-        """List saved agent workspaces, including those without a running VM."""
+        """List saved workspaces, including those without a running VM."""
+        require_hosted()
         typer.echo(json.dumps(api("GET", "/v1/agent-workspaces")))
 
     @app.command("checkpoint-status")
     @handled
     def status(operation: str, wait: bool = typer.Option(False, "--wait")):
         """Inspect a checkpoint or restore operation."""
+        require_hosted()
         display(api("GET", "/v1/agent-state-operations/" + quote(operation, safe="")), wait)

@@ -26,6 +26,7 @@ from .agent_connections import app as agent_app
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
 from .usage import register as register_usage
+from .agent_persistence import register as register_persistence
 
 app = typer.Typer(
     name="vmnest",
@@ -46,6 +47,7 @@ app.add_typer(infra_app)
 register_files(app)
 register_accounts(app)
 register_usage(app)
+register_persistence(app, agent_prefix=False)
 
 
 @app.callback()
@@ -171,7 +173,7 @@ def create(
     ),
     disposable: bool = typer.Option(
         False, "--disposable",
-        help="Disable hosted agent checkpoints; discard VM files on termination. Self-hosted VMs are already disposable.",
+        help="Disable hosted checkpoints; discard VM files on termination. Self-hosted VMs are already disposable.",
     ),
     prompt: str | None = typer.Option(None, "--prompt"),
     prompt_file: Path | None = typer.Option(None, "--prompt-file"),

@@ -142,6 +142,7 @@ def test_profile_model_only_update_preserves_connections(monkeypatch):
         calls.append((method, body))
         return {'name':'dev','provider':'codex','model':'model-a','integrations':['github']}
     monkeypatch.setattr('agent_sandbox.cli.agent_profiles.api', api)
+    monkeypatch.setattr('agent_sandbox.cli.agent_models.api', lambda *a: {'items':[{'id':'model-a','name':'Model A','efforts':['low'],'default':True}], 'defaults':{}})
     result = CliRunner().invoke(app, ['update','dev','--model','model-a'])
     assert result.exit_code == 0, result.output
     assert calls[-1] == ('PATCH', {'model':'model-a'})

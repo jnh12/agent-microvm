@@ -39,7 +39,7 @@ def endpoint(name):
     return "/v1/vms/" + quote(name, safe="") + "/agent/runs"
 
 
-def submit(name, text, session="main", queue=False, request_key=None, model=None):
+def submit(name, text, session="main", queue=False, request_key=None, model=None, effort=None):
     key = request_key or str(uuid.uuid4())
     try:
         result = api(
@@ -51,6 +51,7 @@ def submit(name, text, session="main", queue=False, request_key=None, model=None
                 "queue": queue,
                 "request_key": key,
                 **({"model": model} if model is not None else {}),
+                **({"effort": effort} if effort is not None else {}),
             },
         )
     except AccountError as exc:
@@ -120,6 +121,9 @@ def register(app):
     @handled
     def send(
         name: str,
+        effort: str | None = typer.Option(
+            None, "--effort", help="Reasoning effort; select lists choices."
+        ),
         model: str | None = typer.Option(
             None, "--model", help="Model for this conversation; default resets to provider default."
         ),
@@ -131,7 +135,11 @@ def register(app):
         wait: bool = typer.Option(False, "--wait"),
         as_json: bool = typer.Option(False, "--json"),
     ):
-        result = submit(name, prompt_text(prompt, prompt_file), session, queue, request_key, model)
+        text = prompt_text(prompt, prompt_file)
+        from .agent_models import for_computer
+
+        model, effort = for_computer(name, model, effort, session, as_json)
+        result = submit(name, text, session, queue, request_key, model, effort)
         typer.echo(json.dumps(result) if as_json else result["id"] + ": " + result["status"])
         if wait:
             final = follow(result["id"], as_json)
@@ -223,6 +231,9 @@ def register(app):
     @handled
     def chat(
         name: str,
+        effort: str | None = typer.Option(
+            None, "--effort", help="Reasoning effort; select lists choices."
+        ),
         model: str | None = typer.Option(
             None, "--model", help="Model for this conversation; default resets to provider default."
         ),
@@ -233,4 +244,7 @@ def register(app):
     ):
         from .chat import run_chat
 
-        run_chat(name, session, history, model=model)
+        from .agent_models import for_computer
+
+        model, effort = for_computer(name, model, effort, session)
+        run_chat(name, session, history, model=model, effort=effort)

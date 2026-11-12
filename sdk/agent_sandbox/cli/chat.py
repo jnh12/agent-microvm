@@ -157,7 +157,7 @@ def make_prompt(status):
     )
 
 
-def run_chat(name, session, history, model=None):
+def run_chat(name, session, history, model=None, effort=None):
     from .agent_runs import api, endpoint, poll_interval, resolve, submit
 
     interval = poll_interval()
@@ -262,6 +262,7 @@ def run_chat(name, session, history, model=None):
                             session,
                             queued,
                             **({"model": model} if model is not None else {}),
+                            **({"effort": effort} if effort is not None else {}),
                         )
                         local_runs.add(result["id"])
                         observer.status = label(result["status"])

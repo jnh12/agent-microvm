@@ -1050,3 +1050,27 @@ Service-wide database disaster-recovery backups retain their existing retention 
 
 API: `POST /v1/vms/{name}/shutdown`; `DELETE /v1/vms/{name}?permanent=true`.
 The legacy DELETE without `permanent=true` keeps its save-and-shutdown behavior.
+
+### Default models and effort selection
+
+`vmnest agent models --provider codex` (or `claude`) shows the connected runtime's
+model catalog and the effort levels supported by each model; `--json` is available.
+`vmnest agent model --provider codex` opens a model/effort picker and saves account-wide
+defaults. Scripts can use `vmnest agent model MODEL --provider codex --effort high --json`.
+Use `agent model default --provider codex` to return to provider defaults.
+
+Chat, send, and profile create/update accept `--effort LEVEL` as well as `--model MODEL`.
+They show available models/efforts when selecting and reject unsupported choices before
+submitting. Use `--model select --effort select` for interactive selection, or `agent models
+--json` for machine-readable discovery. Model catalogs come from Codex `model/list` and
+Claude's initialization response, not a hard-coded list; catalog discovery sends no prompts.
+
+Account defaults apply to new conversations, including existing computers. Priority:
+explicit run choice, saved conversation choice, computer's copied profile settings, account
+defaults, provider defaults. Changing a model resets effort unless explicitly supplied.
+Existing conversations keep their choices. Profile updates affect new computers.
+
+API: GET `/v1/agent-connections/{provider}/models`; GET/PUT
+`/v1/agent-connections/{provider}/model-defaults` with `model` and `effort`.
+Run and profile schemas also accept `effort`; it persists through queueing and restoration.
+The catalog describes runtime-supported choices; providers still enforce account access.

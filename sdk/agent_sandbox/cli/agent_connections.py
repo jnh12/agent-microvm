@@ -18,6 +18,8 @@ app = typer.Typer(name="agent", help="Manage saved agent account connections.")
 app.add_typer(profiles_app, name="profile")
 
 register_runs(app)
+from .agent_models import register as register_models
+register_models(app)
 Provider = Literal["codex", "claude"]
 
 

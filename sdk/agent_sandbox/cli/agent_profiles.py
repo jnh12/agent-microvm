@@ -89,12 +89,13 @@ def emit(result, as_json):
         items = result.get("items", [result])
         table(
             "Agent profiles",
-            ["Name", "Provider", "Model", "Connections"],
+            ["Name", "Provider", "Model", "Effort", "Connections"],
             (
                 (
                     item["name"],
                     item.get("provider", "-"),
                     item.get("model") or "Provider default",
+                    item.get("effort") or "Default",
                     "All, including future connections"
                     if item.get("integrations") == "all"
                     else ", ".join(item.get("integrations", [])) or item.get("status", "None"),
@@ -109,6 +110,7 @@ def emit(result, as_json):
 @handled
 def create(
     name: str,
+    effort: str | None = typer.Option(None, "--effort"),
     model: str | None = typer.Option(None, "--model"),
     provider: Literal["codex", "claude"] = typer.Option("codex", "--provider"),
     integration: list[str] | None = typer.Option(None, "--integration"),
@@ -117,6 +119,9 @@ def create(
     as_json: bool = typer.Option(False, "--json"),
 ):
     selected = select(integration, all_integrations, no_integrations, as_json, provider)
+    from .agent_models import choose
+
+    model, effort = choose(provider, model, effort, as_json=as_json)
     emit(
         api(
             "POST",
@@ -126,6 +131,7 @@ def create(
                 "provider": provider,
                 "integrations": selected,
                 **({"model": model} if model is not None else {}),
+                **({"effort": effort} if effort is not None else {}),
             },
         ),
         as_json,
@@ -136,6 +142,7 @@ def create(
 @handled
 def update(
     name: str,
+    effort: str | None = typer.Option(None, "--effort"),
     model: str | None = typer.Option(
         None, "--model", help="Set model; default resets to provider default."
     ),
@@ -144,11 +151,19 @@ def update(
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
-    provider = api("GET", "/v1/agent-profiles/" + quote(name, safe=""))["provider"]
+    saved = api("GET", "/v1/agent-profiles/" + quote(name, safe=""))
+    provider = saved["provider"]
+    from .agent_models import choose
+
+    model, effort = choose(
+        provider, model, effort, as_json=as_json, current_model=saved.get("model")
+    )
     body = {}
     if model is not None:
         body["model"] = model
-    if model is None or integration or all_integrations or no_integrations:
+    if effort is not None:
+        body["effort"] = effort
+    if (model is None and effort is None) or integration or all_integrations or no_integrations:
         body["integrations"] = select(
             integration, all_integrations, no_integrations, as_json, provider
         )

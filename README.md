@@ -1,5 +1,3 @@
-<p align="center"><a href="https://vmnest.cc"><img src="docs/branding/vmnest-logo.png" alt="VMNest" width="480"></a></p>
-
 <div align="center">
 
 <img src="demo/header.gif" alt="A pixel robot enthusiastically shovels sand next to a laptop and a rubber duck inside its own tiny sandbox." width="768">

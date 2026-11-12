@@ -46,6 +46,34 @@ def register(app):
         except SandboxError as exc:
             _fail(str(exc))
 
+    @app.command("shutdown")
+    @handled
+    def shutdown(name: str, as_json: bool = typer.Option(False, "--json")):
+        """Save and shut down a computer. Open it later to resume."""
+        from agent_sandbox.errors import SandboxError
+        from .main import _fail
+
+        try:
+            present(request("POST", vm_path(name) + "/shutdown"), as_json)
+        except SandboxError as exc:
+            _fail(str(exc))
+
+    @app.command("delete")
+    @handled
+    def delete(name: str, as_json: bool = typer.Option(False, "--json")):
+        """Permanently delete a computer, its saved workspace, and chat history."""
+        from agent_sandbox.errors import SandboxError
+        from .main import _fail
+
+        try:
+            result = request("DELETE", vm_path(name) + "?permanent=true")
+            if as_json:
+                details(result, True)
+            else:
+                typer.echo(f"{name}: {result['status']}")
+        except SandboxError as exc:
+            _fail(str(exc))
+
     @app.command("wait")
     @handled
     def wait_computer(

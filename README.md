@@ -1035,3 +1035,18 @@ Order: explicit model, saved conversation choice, computer's profile model, prov
 Model access is validated by the provider; unsupported names fail the run rather than silently
 switching. Run responses expose the requested model (`null` means runtime default).
 The API accepts `model` in POST agent runs and POST/PATCH agent profiles.
+
+### Shutdown and deletion
+
+`vmnest shutdown NAME` saves the workspace before stopping compute. Use `vmnest open NAME`
+or agent chat to return. Active agent runs or background work must finish or be cancelled first.
+Disposable computers stop without saving.
+
+`vmnest delete NAME` permanently stops compute and deletes all versions of its saved workspace,
+conversation history in the live service, and its listing. This command does not ask for confirmation.
+It refuses to race an in-progress save/restore. If cleanup cannot finish immediately, status is
+`deleting`; recovery retries and prevents waking or reusing the name until removal completes.
+Service-wide database disaster-recovery backups retain their existing retention policy.
+
+API: `POST /v1/vms/{name}/shutdown`; `DELETE /v1/vms/{name}?permanent=true`.
+The legacy DELETE without `permanent=true` keeps its save-and-shutdown behavior.

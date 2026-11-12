@@ -16,6 +16,8 @@ HOSTED = {
     "project",
     "open",
     "wait",
+    "shutdown",
+    "delete",
 }
 DIRECT = {"infra", "image", "mcp", "start", "stop", "rm"}
 DIRECT_OPTIONS = {

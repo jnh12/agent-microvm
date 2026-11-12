@@ -186,3 +186,19 @@ def test_wait_failed_startup_is_an_error(monkeypatch):
     )
     result = runner.invoke(app, ["wait", "dev"])
     assert result.exit_code != 0 and "Setup failed" in result.output
+
+def test_shutdown_and_delete_transport(monkeypatch):
+    from agent_sandbox.cli.main import app
+    from typer.testing import CliRunner
+    monkeypatch.setenv('VMNEST_MODE','hosted')
+    monkeypatch.setenv('VMNEST_API_URL','https://example.test')
+    calls=[]
+    def request(method,path):
+        calls.append((method,path))
+        return {'name':'dev','status':'deleted' if method=='DELETE' else 'sleeping'}
+    monkeypatch.setattr('agent_sandbox.cli.computers.request',request)
+    runner=CliRunner()
+    assert runner.invoke(app,['shutdown','dev']).exit_code==0
+    assert calls[-1]==('POST','/v1/vms/dev/shutdown')
+    assert runner.invoke(app,['delete','dev']).exit_code==0
+    assert calls[-1]==('DELETE','/v1/vms/dev?permanent=true')

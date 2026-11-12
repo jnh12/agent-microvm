@@ -48,3 +48,22 @@ def test_create_disposable_transports_flag(monkeypatch):
     result = runner.invoke(app, ["create", "saved", "--agent", "claude"])
     assert result.exit_code == 0, result.output
     assert "disposable" not in calls[-1]
+
+
+def test_create_approval_option(monkeypatch):
+    calls = []
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+
+    def request(method, path, body=None):
+        calls.append(body)
+        return {"id": "vm", "state": "RUNNING"}
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    runner = CliRunner()
+    result = runner.invoke(app, ["create", "careful", "--agent", "claude", "--approvals"])
+    assert result.exit_code == 0, result.output
+    assert calls[-1]["approvals"] is True
+    result = runner.invoke(app, ["create", "free", "--agent", "codex"])
+    assert result.exit_code == 0, result.output
+    assert "approvals" not in calls[-1]
+    assert runner.invoke(app, ["create", "invalid", "--approvals"]).exit_code != 0

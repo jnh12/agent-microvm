@@ -936,3 +936,5 @@ update; adding the CLI alone does not enable them on an older hosted deployment.
 Hosted agent persistence: `vmnest agent checkpoint NAME --terminate --wait` saves before shutdown; `vmnest agent restore NAME --wait` restores into a fresh VM. Use `vmnest agent workspaces` and `vmnest agent checkpoint-status OPERATION` to inspect saved workspaces and operations. Requires a hosted API with persistence configured.
 
 To opt out of hosted persistence: `vmnest create scratch --agent codex --disposable` (or `--agent claude`). Disposable VMs skip checkpoints and lose guest state on termination; they do not auto-terminate after a prompt.
+
+Hosted agent runs default to unrestricted provider execution. Use `vmnest create careful --agent claude --approvals` (or Codex) to enable permission prompts. Sudo-enabled images grant passwordless sudo inside the VM in either mode.

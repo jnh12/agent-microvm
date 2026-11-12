@@ -166,6 +166,9 @@ def _print_exec(result) -> None:
 @app.command()
 @routed
 def create(
+    approvals: bool = typer.Option(
+        False, "--approvals", help="Require provider approval prompts for hosted agent actions."
+    ),
     disposable: bool = typer.Option(
         False, "--disposable",
         help="Disable hosted agent checkpoints; discard VM files on termination. Self-hosted VMs are already disposable.",
@@ -193,6 +196,8 @@ def create(
     """Create and start a named sandbox."""
     if prompt is not None or prompt_file is not None:
         _fail("Agent prompts apply only to remote mode")
+    if approvals:
+        _fail("--approvals applies only to hosted agent mode")
     if profile:
         _fail("--profile applies only to remote mode")
     if agent:

@@ -39,6 +39,10 @@ def routed(function):
                         raise SandboxError("--prompt requires --agent")
                     text = prompt_text(kwargs.get("prompt"), kwargs.get("prompt_file"))
                 body = {"name": name, "request_key": key}
+                if kwargs.get("approvals"):
+                    if not kwargs.get("agent"):
+                        raise SandboxError("--approvals requires --agent")
+                    body["approvals"] = True
                 if kwargs.get("disposable"):
                     body["disposable"] = True
                 if kwargs.get("agent"):

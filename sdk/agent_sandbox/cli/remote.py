@@ -5,6 +5,7 @@ import functools
 import uuid
 from pathlib import Path
 
+from agent_sandbox.accounts import AccountError
 from agent_sandbox.errors import SandboxError
 from agent_sandbox.models import ExecResult
 from agent_sandbox.remote import remote_url, request, vm_path
@@ -30,19 +31,44 @@ def routed(function):
             name = kwargs.get("name")
             path = vm_path(name) if name else "/v1/vms"
             if operation == "create":
+                from .agent_runs import prompt_text, submit
+
+                text = None
+                if kwargs.get("prompt") is not None or kwargs.get("prompt_file") is not None:
+                    if not kwargs.get("agent"):
+                        raise SandboxError("--prompt requires --agent")
+                    text = prompt_text(kwargs.get("prompt"), kwargs.get("prompt_file"))
                 body = {"name": name, "request_key": key}
                 if kwargs.get("agent"):
                     if kwargs["agent"] not in {"codex", "claude"}:
                         raise SandboxError("--agent must be codex or claude")
                     body["agent"] = kwargs["agent"]
                 if kwargs.get("profile"):
-                    if kwargs.get("agent") != "codex":
-                        raise SandboxError("--profile requires --agent codex")
+                    if kwargs.get("agent") not in {"codex", "claude"}:
+                        raise SandboxError("--profile requires --agent codex or claude")
                     body["profile"] = kwargs["profile"]
                 result = request("POST", "/v1/vms", body)
                 if not result.get("id"):
                     raise SandboxError(f"Creation is {result['state']}; inspect before proceeding")
-                console.print(f"created {name} ({result['id']})")
+                if text is not None:
+                    try:
+                        result["run"] = submit(
+                            name,
+                            text,
+                            request_key="create-"
+                            + __import__("hashlib").sha256(key.encode()).hexdigest(),
+                        )
+                    except Exception as exc:
+                        raise SandboxError(
+                            f"VM {name} was created, but prompt submission failed: {exc}"
+                        ) from None
+                result["request_key"] = key
+                if kwargs.get("as_json"):
+                    console.print_json(data=result)
+                else:
+                    console.print(f"created {name} ({result['id']})")
+                    if result.get("run"):
+                        console.print(f"Run {result['run']['id']}: {result['run']['status']}")
                 return
             if operation in {"exec", "run"}:
                 cmd = kwargs.get("cmd")
@@ -94,7 +120,7 @@ def routed(function):
                 console.print(table)
             else:
                 raise SandboxError("This operation is not available through the remote API")
-        except SandboxError as exc:
+        except (SandboxError, AccountError) as exc:
             if operation in {"create", "run", "exec"}:
                 _fail(
                     f"{exc}\nRequest key: {key}. "

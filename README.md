@@ -907,3 +907,28 @@ is an explicit selection and `[]` means none. Existing saved arrays remain fixed
 selections; rerun configure/profile update with `--all-integrations` to opt in.
 Agent sessions discover additions according to the provider runtime, usually on
 the next session startup. This does not enable plugin or skill syncing.
+
+### Send tasks and continue conversations (hosted mode)
+
+```sh
+vmnest create dev --agent codex --prompt "Inspect this project"
+vmnest agent send dev "Fix the tests" --request-key task-42 --json
+vmnest agent send dev "Update the docs afterward" --queue
+vmnest agent status dev --json
+vmnest agent logs dev --follow
+vmnest agent chat dev
+```
+
+Messages continue the `main` conversation; use `--session NAME` for another.
+`send` returns immediately; add `--wait` to follow progress. `--prompt-file FILE`
+works with `create` and `agent send`. Work continues after disconnecting the CLI.
+Use `agent sessions`, `agent runs`, `agent cancel VM --run ID`, and
+`agent approve VM --run ID --approval ID` for explicit control. `--deny` declines;
+`--response-file` supplies a structured answer for provider-specific questions.
+
+Busy runs reject new messages unless `--queue` is explicit. Failure or active
+cancellation pauses the queue; use `agent resume-queue VM` after checking results.
+Retries must reuse `--request-key`. Polling/events support structured JSON and
+`logs --after CURSOR` resumes output. `agent status` without a VM still reports
+saved account connections. These commands require the corresponding service
+update; adding the CLI alone does not enable them on an older hosted deployment.

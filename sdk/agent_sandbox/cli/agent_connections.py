@@ -12,8 +12,12 @@ from agent_sandbox.cli.accounts import handled
 from agent_sandbox.cli.agent_profiles import api, select
 from agent_sandbox.cli.agent_profiles import app as profiles_app
 
+from .agent_runs import register as register_runs
+
 app = typer.Typer(name="agent", help="Manage saved agent account connections.")
 app.add_typer(profiles_app, name="profile")
+
+register_runs(app)
 Provider = Literal["codex", "claude"]
 
 
@@ -178,7 +182,17 @@ def connect(
 
 @app.command()
 @handled
-def status(as_json: bool = typer.Option(False, "--json")):
+def status(
+    as_json: bool = typer.Option(False, "--json"),
+    name: str | None = typer.Argument(None),
+    run_id: str | None = typer.Option(None, "--run"),
+):
+    if name or run_id:
+        from .agent_runs import resolve
+
+        result = resolve(name, run_id)
+        typer.echo(json.dumps(result) if as_json else result["id"] + ": " + result["status"])
+        return
     result = AccountClient(service_url()).authenticated("GET", "/v1/agent-connections")
     if as_json:
         typer.echo(json.dumps(result))

@@ -79,21 +79,24 @@ def emit(result, as_json):
     if as_json:
         typer.echo(json.dumps(result))
     else:
+        from .output import table
+
         items = result.get("items", [result])
-        for item in items:
-            typer.echo(
-                f"{item['name']}: "
-                + (
-                    "all connections (including future connections)"
+        table(
+            "Agent profiles",
+            ["Name", "Provider", "Connections"],
+            (
+                (
+                    item["name"],
+                    item.get("provider", "-"),
+                    "All, including future connections"
                     if item.get("integrations") == "all"
-                    else (
-                        ", ".join(item.get("integrations", []))
-                        or item.get("status", "no integrations")
-                    )
+                    else ", ".join(item.get("integrations", [])) or item.get("status", "None"),
                 )
-            )
-        if not items:
-            typer.echo("No saved profiles.")
+                for item in items
+            ),
+            empty="No saved profiles.",
+        )
 
 
 @app.command("create")

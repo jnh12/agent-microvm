@@ -17,6 +17,7 @@ def routed(function):
         if not remote_url():
             return function(*args, **kwargs)
         from .main import _fail, _print_exec, console
+        from .output import details
 
         operation = function.__name__
         key = kwargs.get("request_key") or str(uuid.uuid4())
@@ -125,7 +126,7 @@ def routed(function):
             elif operation in {"inspect", "ps"}:
                 result = request("GET", path)
                 if operation == "inspect":
-                    console.print_json(data=result)
+                    details(result, kwargs.get("as_json", False), "VM details")
                 else:
                     console.print(f"{name}: {result['state']} ({result['id']})")
             elif operation == "ls":

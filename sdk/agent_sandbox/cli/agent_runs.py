@@ -2,7 +2,6 @@
 
 import json
 import os
-import threading
 import time
 import uuid
 from pathlib import Path
@@ -75,31 +74,23 @@ def render(event, as_json):
     if as_json:
         typer.echo(json.dumps(event))
         return
-    message = event.get("data", {})
-    if event.get("type") == "prompt":
-        typer.echo("You: " + message.get("text", ""))
-    elif event.get("type") == "approval":
-        typer.echo("\nApproval requested: " + json.dumps(message))
-    elif message.get("method") == "item/agentMessage/delta":
-        typer.echo(message.get("params", {}).get("delta", ""), nl=False)
-    elif message.get("type") == "assistant":
-        for part in message.get("message", {}).get("content", []):
-            if part.get("type") == "text":
-                typer.echo(part["text"])
-            elif part.get("type") == "tool_use":
-                typer.echo("[tool] " + part.get("name", ""))
-    elif message.get("method") in ("item/started", "item/completed"):
-        item = message.get("params", {}).get("item", {})
-        if item.get("type") != "agentMessage":
-            typer.echo("[activity] " + item.get("type", ""))
+    from .chat import EventRenderer
+
+    EventRenderer().render(event)
 
 
 def follow(identifier, as_json=False, after=0, wait=True):
     path = "/v1/agent-runs/" + quote(identifier, safe="")
+    from .chat import EventRenderer
+
+    renderer = EventRenderer()
     while True:
         page = api("GET", path + "/events?after=" + str(after))
         for event in page["items"]:
-            render(event, as_json)
+            if as_json:
+                render(event, True)
+            else:
+                renderer.render(event)
         after = page["cursor"]
         result = api("GET", path)
         if (
@@ -110,6 +101,7 @@ def follow(identifier, as_json=False, after=0, wait=True):
         ):
             if result["status"] in TERMINAL and page["items"]:
                 continue  # Drain any final page before reporting completion.
+            renderer.end_stream()
             typer.echo(
                 json.dumps(result) if as_json else "\n" + identifier + ": " + result["status"]
             )
@@ -141,23 +133,35 @@ def register(app):
     @handled
     def sessions(name: str, as_json: bool = typer.Option(False, "--json")):
         result = api("GET", "/v1/vms/" + quote(name, safe="") + "/agent/sessions")
-        typer.echo(
-            json.dumps(result)
-            if as_json
-            else "\n".join(item["name"] + " " + item["id"] for item in result["items"])
-        )
+        from .output import table
+
+        if as_json:
+            typer.echo(json.dumps(result))
+        else:
+            table(
+                "Conversations",
+                ["Session", "ID"],
+                ((item["name"], item["id"]) for item in result["items"]),
+                empty="No conversations yet. Send a message to start one.",
+            )
 
     @app.command("runs")
     @handled
     def runs(name: str, as_json: bool = typer.Option(False, "--json")):
         result = api("GET", endpoint(name))
-        typer.echo(
-            json.dumps(result)
-            if as_json
-            else "\n".join(
-                r["id"] + " " + r["session"] + " " + r["status"] for r in result["items"]
+        from .output import label, table
+
+        if as_json:
+            typer.echo(json.dumps(result))
+        else:
+            table(
+                "Agent runs",
+                ["Run", "Session", "Status"],
+                ((r["id"], r["session"], label(r["status"])) for r in result["items"]),
+                empty="No agent runs yet.",
             )
-        )
+            if result.get("queue_paused"):
+                typer.echo("Queue paused. Use vmnest agent resume-queue to continue.")
 
     @app.command("logs")
     @handled
@@ -208,70 +212,13 @@ def register(app):
 
     @app.command("chat")
     @handled
-    def chat(name: str, session: str = typer.Option("main", "--session")):
-        stop = threading.Event()
+    def chat(
+        name: str,
+        session: str = typer.Option("main", "--session"),
+        history: int = typer.Option(
+            5, "--history", min=0, help="Recent completed runs to display."
+        ),
+    ):
+        from .chat import run_chat
 
-        def observe():
-            cursors, finished = {}, set()
-            while not stop.is_set():
-                try:
-                    items = api("GET", endpoint(name) + "?session=" + quote(session, safe=""))[
-                        "items"
-                    ]
-                    for item in reversed(items):
-                        identifier = item["id"]
-                        if identifier in finished:
-                            continue
-                        page = api(
-                            "GET",
-                            "/v1/agent-runs/"
-                            + identifier
-                            + "/events?after="
-                            + str(cursors.get(identifier, 0)),
-                        )
-                        for event in page["items"]:
-                            render(event, False)
-                        cursors[identifier] = page["cursor"]
-                        if item["status"] in TERMINAL and not page["items"]:
-                            typer.echo("\n" + identifier + ": " + item["status"])
-                            finished.add(identifier)
-                except AccountError as exc:
-                    typer.echo(str(exc), err=True)
-                    stop.set()
-                stop.wait(poll_interval())
-
-        worker = threading.Thread(target=observe, daemon=True)
-        worker.start()
-        typer.echo("Session " + session + ". /exit, /queue TEXT, /cancel, /allow ID, /deny ID")
-        try:
-            while not stop.is_set():
-                try:
-                    text = typer.prompt("You")
-                except (EOFError, KeyboardInterrupt):
-                    return
-                if text == "/exit":
-                    return
-                try:
-                    if text == "/cancel":
-                        current = resolve(name, session=session)
-                        api("POST", "/v1/agent-runs/" + current["id"] + "/cancel")
-                    elif text.startswith(("/allow ", "/deny ")):
-                        current = resolve(name, session=session)
-                        command, approval = text.split(" ", 1)
-                        api(
-                            "POST",
-                            "/v1/agent-runs/" + current["id"] + "/approval",
-                            {
-                                "approval_id": approval.strip(),
-                                "decision": "allow" if command == "/allow" else "deny",
-                            },
-                        )
-                    else:
-                        queued = text.startswith("/queue ")
-                        result = submit(name, text[7:] if queued else text, session, queued)
-                        typer.echo(result["id"] + ": " + result["status"])
-                except AccountError as exc:
-                    typer.echo(str(exc), err=True)
-        finally:
-            stop.set()
-            worker.join(timeout=2)
+        run_chat(name, session, history)

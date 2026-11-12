@@ -28,7 +28,7 @@ def _seed_state(tmp_path, monkeypatch):
 
 def test_output_full_dump_is_labeled(tmp_path, monkeypatch):
     _seed_state(tmp_path, monkeypatch)
-    result = runner.invoke(app, ["infra", "output"])
+    result = runner.invoke(app, ["infra", "output", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["project"] == "agent-microvm"
@@ -54,7 +54,7 @@ def test_output_empty_state_is_bare(tmp_path, monkeypatch):
     # No state seeded (never provisioned, or destroyed): no fabricated label.
     path = tmp_path / "infra-state.json"
     monkeypatch.setenv("AGENT_SANDBOX_INFRA_STATE", str(path))
-    result = runner.invoke(app, ["infra", "output"])
+    result = runner.invoke(app, ["infra", "output", "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output) == {}
 
@@ -68,7 +68,7 @@ def test_output_name_on_empty_state_fails(tmp_path, monkeypatch):
 
 def test_output_all_lists_every_stack(tmp_path, monkeypatch):
     _seed_state(tmp_path, monkeypatch)
-    result = runner.invoke(app, ["infra", "output", "--all"])
+    result = runner.invoke(app, ["infra", "output", "--all", "--json"])
     assert result.exit_code == 0, result.output
     data = json.loads(result.output)
     assert data["count"] == 2

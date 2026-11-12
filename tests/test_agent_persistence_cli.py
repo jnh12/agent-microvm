@@ -14,7 +14,7 @@ def test_checkpoint_restore_and_status_are_http_only(monkeypatch):
     monkeypatch.setattr("agent_sandbox.cli.agent_persistence.api", api)
     runner = CliRunner()
     result = runner.invoke(
-        app, ["agent", "checkpoint", "dev", "--terminate", "--request-key", "same", "--wait"]
+        app, ["agent", "checkpoint", "dev", "--terminate", "--request-key", "same", "--wait", "--json"]
     )
     assert result.exit_code == 0, result.output
     assert calls[-1] == (

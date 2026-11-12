@@ -25,6 +25,7 @@ from .accounts import register as register_accounts
 from .agent_connections import app as agent_app
 from .agent_persistence import register as register_persistence
 from .mode_help import ModeApp, ModeGroup, selected_mode, unavailable
+from .output import details
 from .projects import app as project_app
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
@@ -436,15 +437,16 @@ def ps(
 @routed
 def inspect(
     name: str = typer.Argument(...),
+    as_json: bool = typer.Option(False, "--json"),
     region: str | None = typer.Option(None, "--region"),
 ) -> None:
-    """Print detailed MicroVM info as JSON."""
+    """Inspect a VM; use --json for the raw response."""
     rec = _require_record(name)
 
     async def _do() -> None:
         cp = ControlPlane(region=region or rec.region)
         info = await cp.get_microvm(rec.microvm_id)
-        console.print_json(json.dumps(info.raw, default=str))
+        details(info.raw, as_json, "VM details")
 
     _guard(_do())
 
@@ -479,6 +481,7 @@ def metrics(
 
 @image_app.command("build")
 def image_build(
+    as_json: bool = typer.Option(False, "--json"),
     directory: str | None = typer.Argument(
         None, help="Guest dir with a Dockerfile (default: ./guest, else the bundled guest)."
     ),
@@ -517,7 +520,7 @@ def image_build(
         resp = await cp.create_microvm_image(
             name=name, s3_bucket=bucket, s3_key=key, execution_role_arn=role
         )
-        console.print_json(json.dumps(resp, default=str))
+        details(resp, as_json, "Image build")
 
     _guard(_do())
 
@@ -951,7 +954,7 @@ def infra_up(
         except Exception as exc:  # noqa: BLE001 - surface as a clean CLI error
             _fail(f"{cfg.project}/{cfg.stack}: {exc}")
         console.print("[green]up complete[/green]")
-        console.print_json(json.dumps(outputs, default=str))
+        details(outputs, title="Infrastructure outputs")
         return
 
     _run_parallel_up(configs, rebuild=rebuild, parallelism=parallelism)
@@ -1242,6 +1245,7 @@ def mcp() -> None:
 
 @infra_app.command("output")
 def infra_output(
+    as_json: bool = typer.Option(False, "--json"),
     name: str | None = typer.Argument(None, help="Single output name, or all if omitted."),
     setup_file: str | None = typer.Option(None, "--file", "-f"),
     stack: str | None = typer.Option(None, "--stack", "-s"),
@@ -1258,7 +1262,7 @@ def infra_output(
             {"project": proj, "stack": stk, **store.load(proj, stk).outputs}
             for proj, stk in store.list_stacks()
         ]
-        console.print_json(json.dumps({"stacks": stacks, "count": len(stacks)}, default=str))
+        details({"stacks": stacks, "count": len(stacks)}, as_json, "Infrastructure outputs")
         return
 
     cfg = _load_infra_config(setup_file, stack)
@@ -1270,7 +1274,7 @@ def infra_output(
         # destroyed). Don't fabricate a project/stack label that looks live.
         if name:
             _fail(f"no such output: {name}")
-        console.print_json(json.dumps({}, default=str))
+        details({}, as_json)
         return
 
     # Label which project/stack these outputs belong to (state keys them by
@@ -1280,9 +1284,9 @@ def infra_output(
         if name not in labeled:
             _fail(f"no such output: {name}")
         value = labeled[name]
-        console.print(value if isinstance(value, str) else json.dumps(value, default=str))
+        details(value, as_json)
     else:
-        console.print_json(json.dumps(labeled, default=str))
+        details(labeled, as_json, "Infrastructure outputs")
 
 
 if __name__ == "__main__":

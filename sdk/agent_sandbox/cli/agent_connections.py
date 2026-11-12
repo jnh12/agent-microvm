@@ -193,16 +193,22 @@ def status(
         from .agent_runs import resolve
 
         result = resolve(name, run_id)
-        typer.echo(json.dumps(result) if as_json else result["id"] + ": " + result["status"])
+        from .output import details
+
+        details(result, as_json, "Agent status")
         return
     result = AccountClient(service_url()).authenticated("GET", "/v1/agent-connections")
     if as_json:
         typer.echo(json.dumps(result))
     else:
-        for item in result["items"]:
-            typer.echo(f"{item['provider']}: {item['status']}")
-        if not result["items"]:
-            typer.echo("No saved agent connections.")
+        from .output import label, table
+
+        table(
+            "Agent connections",
+            ["Provider", "Status"],
+            ((item["provider"], label(item["status"])) for item in result["items"]),
+            empty="No saved agent connections.",
+        )
 
 
 @app.command()
@@ -231,10 +237,23 @@ def integrations(
     if as_json:
         typer.echo(json.dumps(result))
     else:
-        for item in result["items"]:
-            typer.echo(
-                f"{item['name']} ({item['id']}): {'available' if item['available'] else 'unavailable'}"
-            )
+        from .output import table
+
+        selected = result.get("selected", [])
+        table(
+            "Available connections",
+            ["Connection", "Available", "Selected", "ID"],
+            (
+                (
+                    item["name"],
+                    item["available"],
+                    selected == "all" or item["id"] in selected,
+                    item["id"],
+                )
+                for item in result["items"]
+            ),
+            empty="No connections available.",
+        )
 
 
 @app.command()

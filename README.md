@@ -960,3 +960,29 @@ a failed setup; interrupted setup requires reconciliation. `--disposable` opts o
 of checkpoints. The CLI delegates these operations to the hosted HTTP API.
 
 CLI help follows the selected mode (`vmnest setup --mode hosted` or `--mode self-hosted`), including options within shared commands. Before setup, help shows both routes. Help reads local configuration only and requires no sign-in or network access.
+
+
+### Terminal output and chat
+
+Workspace lists, checkpoint progress, VM inspection, project retries, agent
+sessions/runs/profiles/connections, and infrastructure outputs use readable
+summaries or tables by default. Use `--json` for scripts; checkpoint commands
+with `--wait --json` emit one JSON object per progress update. For example:
+
+```sh
+vmnest workspaces
+vmnest workspaces --json
+vmnest inspect dev
+vmnest inspect dev --json
+vmnest agent chat dev
+```
+
+Chat keeps an editable input line separate from background agent output. It
+supports input history, multiline paste, and Esc+Enter to insert a newline;
+Enter sends. Ctrl+C clears input without cancelling remote work. `/cancel`
+explicitly cancels a run; `/queue TEXT` queues another message. `/status` and
+`/help` show status and commands. `/exit` or Ctrl+D detaches without stopping work.
+Input history stays in memory, not on disk. Chat displays the five latest completed
+runs plus active runs; `--history 0` hides completed history and `--history N`
+changes that amount. Disconnected output polling retries reads, never resubmits
+prompts. Piped input uses a plain fallback without terminal control sequences.

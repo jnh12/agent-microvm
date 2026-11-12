@@ -50,8 +50,17 @@ def test_upload_requires_consent_and_does_not_echo_secret(tmp_path, monkeypatch)
             return {"provider": "claude", "status": "stored_unverified"}
 
     monkeypatch.setattr(mod, "AccountClient", Client)
+    monkeypatch.setattr(mod, "api", lambda *args, **kwargs: {"integrations": []})
     runner = CliRunner()
-    args = ["connect", "--provider", "claude", "--credentials-file", str(p), "--json"]
+    args = [
+        "connect",
+        "--provider",
+        "claude",
+        "--credentials-file",
+        str(p),
+        "--json",
+        "--no-integrations",
+    ]
     response = runner.invoke(app, args)
     assert response.exit_code != 0 and not calls
     response = runner.invoke(app, [*args, "--yes"])

@@ -23,6 +23,8 @@ def api(monkeypatch):
             }
         if method == "DELETE":
             return {"name": "dev", "status": "deleted"}
+        if method == "GET" and path == "/v1/agent-profiles/dev":
+            return {"name": "dev", "provider": "codex", "integrations": []}
         if method == "GET":
             return {"items": []}
         return {"name": "dev", **body}
@@ -105,3 +107,13 @@ def test_codex_connect_requires_explicit_unattended_selection_before_upload(
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["integrations"] == ["gh"]
     assert "secret-" not in result.output and len(calls) == 1
+
+
+def test_claude_profile_routes_to_provider(api):
+    result = CliRunner().invoke(
+        app,
+        ["profile", "create", "dev", "--provider", "claude", "--integration", "Gmail", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    assert api[0][1] == "/v1/agent-connections/claude/integrations"
+    assert api[-1][2]["provider"] == "claude"

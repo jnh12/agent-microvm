@@ -1,8 +1,9 @@
-"""Thin hosted API commands for Codex integration defaults and profiles."""
+"""Thin hosted API commands for agent integration defaults and profiles."""
 
 import json
 import os
 import re
+from typing import Literal
 from urllib.parse import quote
 
 import typer
@@ -10,7 +11,7 @@ import typer
 from agent_sandbox.accounts import AccountClient, AccountError, service_url
 from agent_sandbox.cli.accounts import handled
 
-app = typer.Typer(name="profile", help="Manage account-owned Codex integration profiles.")
+app = typer.Typer(name="profile", help="Manage account-owned agent integration profiles.")
 
 
 def api(method, path, body=None):
@@ -20,7 +21,13 @@ def api(method, path, body=None):
     return AccountClient(service_url()).authenticated(method, path, body=body, timeout=timeout)
 
 
-def select(integrations=None, all_integrations=False, no_integrations=False, unattended=False):
+def select(
+    integrations=None,
+    all_integrations=False,
+    no_integrations=False,
+    unattended=False,
+    provider="codex",
+):
     if sum((bool(integrations), all_integrations, no_integrations)) > 1:
         raise AccountError(
             "INVALID_REQUEST", "Choose --integration, --all-integrations, or --no-integrations."
@@ -31,7 +38,7 @@ def select(integrations=None, all_integrations=False, no_integrations=False, una
         raise AccountError(
             "SELECTION_REQUIRED", "Specify --integration, --all-integrations, or --no-integrations."
         )
-    items = api("GET", "/v1/agent-connections/codex/integrations")["items"]
+    items = api("GET", f"/v1/agent-connections/{provider}/integrations")["items"]
     available = [item for item in items if item["available"]]
     if all_integrations:
         return [item["id"] for item in available]
@@ -83,17 +90,18 @@ def emit(result, as_json):
 @handled
 def create(
     name: str,
+    provider: Literal["codex", "claude"] = typer.Option("codex", "--provider"),
     integration: list[str] | None = typer.Option(None, "--integration"),
     all_integrations: bool = typer.Option(False, "--all-integrations"),
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
-    selected = select(integration, all_integrations, no_integrations, as_json)
+    selected = select(integration, all_integrations, no_integrations, as_json, provider)
     emit(
         api(
             "POST",
             "/v1/agent-profiles",
-            {"name": name, "provider": "codex", "integrations": selected},
+            {"name": name, "provider": provider, "integrations": selected},
         ),
         as_json,
     )
@@ -108,7 +116,8 @@ def update(
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
-    selected = select(integration, all_integrations, no_integrations, as_json)
+    provider = api("GET", "/v1/agent-profiles/" + quote(name, safe=""))["provider"]
+    selected = select(integration, all_integrations, no_integrations, as_json, provider)
     emit(
         api("PATCH", "/v1/agent-profiles/" + quote(name, safe=""), {"integrations": selected}),
         as_json,

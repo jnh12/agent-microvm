@@ -889,3 +889,15 @@ vmnest agent profile delete dev --json
 Without `--profile`, new Codex VMs use connection defaults. Profile edits/deletion affect future launches, not existing VMs or retries of their creation request. Missing integrations fail before launch. These commands require the matching profile-capable service (SDK 0.1.3.dev8 / service 0.1.3); they are not available on older deployments.
 
 This version selects Codex account apps only. New Codex VMs disable standalone plugins/custom MCP plugin loading; Claude profile selection is not supported. Runtime configuration controls exposed tools, not the underlying account token's permissions. `VMNEST_DISCOVERY_TIMEOUT_SECONDS` sets the client's discovery timeout (150 seconds by default).
+
+Claude supports the same hosted integration/profile commands as Codex. Add
+`--provider claude` to `agent connect`, `agent integrations`, `agent configure`,
+or `agent profile create`. For example:
+
+```sh
+vmnest agent profile create mail --provider claude --integration Gmail
+vmnest create work --agent claude --profile mail
+```
+
+Selections affect future VMs. `agent profile update` uses the profile's saved
+provider. Unattended connects require `--yes` and an explicit integration selection.

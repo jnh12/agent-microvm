@@ -124,15 +124,7 @@ def connect(
         return
     if sum((bool(integration), all_integrations, no_integrations)) > 1:
         raise AccountError("INVALID_REQUEST", "Choose one integration selection mode.")
-    if provider != "codex" and (integration or all_integrations or no_integrations):
-        raise AccountError(
-            "INVALID_REQUEST", "Integration selection currently supports Codex only."
-        )
-    if (
-        provider == "codex"
-        and (yes or as_json)
-        and not (integration or all_integrations or no_integrations)
-    ):
+    if (yes or as_json) and not (integration or all_integrations or no_integrations):
         raise AccountError(
             "SELECTION_REQUIRED", "Specify --integration, --all-integrations, or --no-integrations."
         )
@@ -164,10 +156,12 @@ def connect(
         f"/v1/agent-connections/{provider}",
         body={"credentials": payload, "replace": replace},
     )
-    if provider == "codex":
+    if provider in ("codex", "claude"):
         try:
-            chosen = select(integration, all_integrations, no_integrations, yes or as_json)
-            configured = api("PATCH", "/v1/agent-connections/codex", {"integrations": chosen})
+            chosen = select(
+                integration, all_integrations, no_integrations, yes or as_json, provider
+            )
+            configured = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
             result["integrations"] = configured["integrations"]
         except AccountError as exc:
             raise AccountError(
@@ -213,8 +207,11 @@ def disconnect(
 
 @app.command()
 @handled
-def integrations(as_json: bool = typer.Option(False, "--json")):
-    result = api("GET", "/v1/agent-connections/codex/integrations")
+def integrations(
+    as_json: bool = typer.Option(False, "--json"),
+    provider: Provider = typer.Option("codex", "--provider"),
+):
+    result = api("GET", f"/v1/agent-connections/{provider}/integrations")
     if as_json:
         typer.echo(json.dumps(result))
     else:
@@ -227,11 +224,12 @@ def integrations(as_json: bool = typer.Option(False, "--json")):
 @app.command()
 @handled
 def configure(
+    provider: Provider = typer.Option("codex", "--provider"),
     integration: list[str] | None = typer.Option(None, "--integration"),
     all_integrations: bool = typer.Option(False, "--all-integrations"),
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
-    chosen = select(integration, all_integrations, no_integrations, as_json)
-    result = api("PATCH", "/v1/agent-connections/codex", {"integrations": chosen})
-    typer.echo(json.dumps(result) if as_json else "Codex defaults saved for future VMs.")
+    chosen = select(integration, all_integrations, no_integrations, as_json, provider)
+    result = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
+    typer.echo(json.dumps(result) if as_json else f"{provider} defaults saved for future VMs.")

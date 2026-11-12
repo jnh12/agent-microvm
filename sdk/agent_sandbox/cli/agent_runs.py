@@ -39,13 +39,19 @@ def endpoint(name):
     return "/v1/vms/" + quote(name, safe="") + "/agent/runs"
 
 
-def submit(name, text, session="main", queue=False, request_key=None):
+def submit(name, text, session="main", queue=False, request_key=None, model=None):
     key = request_key or str(uuid.uuid4())
     try:
         result = api(
             "POST",
             endpoint(name),
-            {"prompt": text, "session": session, "queue": queue, "request_key": key},
+            {
+                "prompt": text,
+                "session": session,
+                "queue": queue,
+                "request_key": key,
+                **({"model": model} if model is not None else {}),
+            },
         )
     except AccountError as exc:
         raise AccountError(
@@ -114,6 +120,9 @@ def register(app):
     @handled
     def send(
         name: str,
+        model: str | None = typer.Option(
+            None, "--model", help="Model for this conversation; default resets to provider default."
+        ),
         prompt: str | None = typer.Argument(None),
         prompt_file: Path | None = typer.Option(None, "--prompt-file"),
         session: str = typer.Option("main", "--session"),
@@ -122,7 +131,7 @@ def register(app):
         wait: bool = typer.Option(False, "--wait"),
         as_json: bool = typer.Option(False, "--json"),
     ):
-        result = submit(name, prompt_text(prompt, prompt_file), session, queue, request_key)
+        result = submit(name, prompt_text(prompt, prompt_file), session, queue, request_key, model)
         typer.echo(json.dumps(result) if as_json else result["id"] + ": " + result["status"])
         if wait:
             final = follow(result["id"], as_json)
@@ -214,6 +223,9 @@ def register(app):
     @handled
     def chat(
         name: str,
+        model: str | None = typer.Option(
+            None, "--model", help="Model for this conversation; default resets to provider default."
+        ),
         session: str = typer.Option("main", "--session"),
         history: int = typer.Option(
             5, "--history", min=0, help="Recent completed runs to display."
@@ -221,4 +233,4 @@ def register(app):
     ):
         from .chat import run_chat
 
-        run_chat(name, session, history)
+        run_chat(name, session, history, model=model)

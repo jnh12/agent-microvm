@@ -157,7 +157,7 @@ def make_prompt(status):
     )
 
 
-def run_chat(name, session, history):
+def run_chat(name, session, history, model=None):
     from .agent_runs import api, endpoint, poll_interval, resolve, submit
 
     interval = poll_interval()
@@ -256,7 +256,13 @@ def run_chat(name, session, history):
                         if not message:
                             console.print("Provide a message after /queue.", style="yellow")
                             continue
-                        result = submit(name, message, session, queued)
+                        result = submit(
+                            name,
+                            message,
+                            session,
+                            queued,
+                            **({"model": model} if model is not None else {}),
+                        )
                         local_runs.add(result["id"])
                         observer.status = label(result["status"])
                         console.print(label(result["status"]), style="dim")

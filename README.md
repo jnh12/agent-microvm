@@ -1020,3 +1020,18 @@ The initial `--prompt` is saved in the same creation request and submitted once 
 the backend after successful setup, even if the CLI exits. `wait` waits for computer
 readiness and prompt submission, not completion of the agent's reply.
 Self-hosted creation is unchanged.
+
+### Agent models
+
+`vmnest agent chat COMPUTER --model MODEL` and `vmnest agent send COMPUTER "prompt" --model MODEL`
+select a model and remember it for that conversation. Omit `--model` to retain the choice;
+use `--model default` to reset to the provider default. A model change restarts the runtime
+between turns and resumes the same conversation. Queued runs retain their accepted model.
+
+Profiles accept `--model` on `agent profile create` and `agent profile update`.
+For example, `vmnest agent profile update dev --model gpt-6.1-sol` changes only the model.
+New computers copy the profile model; editing a profile does not alter existing computers.
+Order: explicit model, saved conversation choice, computer's profile model, provider default.
+Model access is validated by the provider; unsupported names fail the run rather than silently
+switching. Run responses expose the requested model (`null` means runtime default).
+The API accepts `model` in POST agent runs and POST/PATCH agent profiles.

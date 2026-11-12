@@ -93,3 +93,12 @@ def test_create_validates_prompt_before_creating_vm(monkeypatch):
     monkeypatch.setattr(remote, "request", lambda *a: calls.append(a))
     result = CliRunner().invoke(main_app, ["create", "dev", "--prompt", "hello"])
     assert result.exit_code != 0 and not calls
+
+def test_send_model_transport(monkeypatch):
+    from agent_sandbox.cli.agent_runs import submit
+    calls = []
+    monkeypatch.setattr('agent_sandbox.cli.agent_runs.api', lambda *args: calls.append(args) or {'id':'run'})
+    submit('dev', 'hello', model='model-a')
+    assert calls[-1][2]['model'] == 'model-a'
+    submit('dev', 'hello')
+    assert 'model' not in calls[-1][2]

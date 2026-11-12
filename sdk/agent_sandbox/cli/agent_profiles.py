@@ -89,11 +89,12 @@ def emit(result, as_json):
         items = result.get("items", [result])
         table(
             "Agent profiles",
-            ["Name", "Provider", "Connections"],
+            ["Name", "Provider", "Model", "Connections"],
             (
                 (
                     item["name"],
                     item.get("provider", "-"),
+                    item.get("model") or "Provider default",
                     "All, including future connections"
                     if item.get("integrations") == "all"
                     else ", ".join(item.get("integrations", [])) or item.get("status", "None"),
@@ -108,6 +109,7 @@ def emit(result, as_json):
 @handled
 def create(
     name: str,
+    model: str | None = typer.Option(None, "--model"),
     provider: Literal["codex", "claude"] = typer.Option("codex", "--provider"),
     integration: list[str] | None = typer.Option(None, "--integration"),
     all_integrations: bool = typer.Option(False, "--all-integrations"),
@@ -119,7 +121,12 @@ def create(
         api(
             "POST",
             "/v1/agent-profiles",
-            {"name": name, "provider": provider, "integrations": selected},
+            {
+                "name": name,
+                "provider": provider,
+                "integrations": selected,
+                **({"model": model} if model is not None else {}),
+            },
         ),
         as_json,
     )
@@ -129,15 +136,24 @@ def create(
 @handled
 def update(
     name: str,
+    model: str | None = typer.Option(
+        None, "--model", help="Set model; default resets to provider default."
+    ),
     integration: list[str] | None = typer.Option(None, "--integration"),
     all_integrations: bool = typer.Option(False, "--all-integrations"),
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
     provider = api("GET", "/v1/agent-profiles/" + quote(name, safe=""))["provider"]
-    selected = select(integration, all_integrations, no_integrations, as_json, provider)
+    body = {}
+    if model is not None:
+        body["model"] = model
+    if model is None or integration or all_integrations or no_integrations:
+        body["integrations"] = select(
+            integration, all_integrations, no_integrations, as_json, provider
+        )
     emit(
-        api("PATCH", "/v1/agent-profiles/" + quote(name, safe=""), {"integrations": selected}),
+        api("PATCH", "/v1/agent-profiles/" + quote(name, safe=""), body),
         as_json,
     )
 

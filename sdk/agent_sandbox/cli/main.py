@@ -21,6 +21,7 @@ from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
+from .agent_connections import app as agent_app
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
 from .usage import register as register_usage
@@ -33,6 +34,8 @@ app = typer.Typer(
 )
 image_app = typer.Typer(name="image", help="Manage MicroVM images.", no_args_is_help=True)
 app.add_typer(image_app)
+
+app.add_typer(agent_app)
 infra_app = typer.Typer(
     name="infra",
     help="Deploy/manage MicroVM infrastructure from sandbox.yaml.",

@@ -153,6 +153,8 @@ class AccountClient:
                     code = "SERVICE_ERROR"
                 # Avoid printing arbitrary provider/proxy responses or secrets.
                 messages = {
+                    "CONNECTION_EXISTS": "A connection is already saved. Use --replace to explicitly replace it.",
+                    "INVALID_REQUEST": "Unsupported or invalid request data.",
                     "AUTH_REQUIRED": "Sign in with vmnest login.",
                     "AUTH_EXPIRED": "Session invalid or revoked. Run vmnest login.",
                     "LOGIN_EXPIRED": "Login expired. Run vmnest login again.",

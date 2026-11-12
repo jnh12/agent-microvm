@@ -958,3 +958,5 @@ use idempotent commands to recreate system dependencies while preserving workspa
 files. Inspect the VM for setup status. `vmnest project retry dev` explicitly retries
 a failed setup; interrupted setup requires reconciliation. `--disposable` opts out
 of checkpoints. The CLI delegates these operations to the hosted HTTP API.
+
+CLI help follows the selected mode (`vmnest setup --mode hosted` or `--mode self-hosted`), including options within shared commands. Before setup, help shows both routes. Help reads local configuration only and requires no sign-in or network access.

@@ -24,12 +24,14 @@ from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 from .accounts import register as register_accounts
 from .agent_connections import app as agent_app
 from .agent_persistence import register as register_persistence
+from .mode_help import ModeApp, ModeGroup, selected_mode, unavailable
 from .projects import app as project_app
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
 from .usage import register as register_usage
 
-app = typer.Typer(
+app = ModeApp(
+    cls=ModeGroup,
     name="vmnest",
     help="agent-microvm: isolated microVM sandboxes on AWS Lambda MicroVMs.",
     no_args_is_help=True,
@@ -54,14 +56,15 @@ register_persistence(app, agent_prefix=False)
 
 @app.callback()
 def mode_guard(ctx: typer.Context):
-    from agent_sandbox.remote import remote_url
-    if ctx.invoked_subcommand in {"setup", "login", "whoami", "logout"}:
-        return
-    try:
-        if remote_url() and ctx.invoked_subcommand in {"infra", "image", "mcp"}:
-            raise typer.BadParameter("This command is direct-only; select self-hosted mode")
-    except SandboxError as exc:
-        _fail(str(exc))
+    selected = selected_mode()
+    if unavailable(ctx.invoked_subcommand, selected):
+        required = "self-hosted" if selected == "hosted" else "hosted"
+        label = "direct-only" if required == "self-hosted" else "hosted-only"
+        raise typer.BadParameter(
+            f"This command is {label}. Use "
+            f"vmnest setup --mode {required}"
+        )
+
 
 
 console = Console()

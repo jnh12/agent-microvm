@@ -1,9 +1,5 @@
-import json
-
 from agent_sandbox.cli.main import app
 from typer.testing import CliRunner
-
-
 
 
 def test_create_disposable_transports_flag(monkeypatch):
@@ -44,8 +40,6 @@ def test_create_approval_option(monkeypatch):
     assert runner.invoke(app, ["create", "invalid", "--approvals"]).exit_code != 0
 
 
-
-
 def test_create_project_options(monkeypatch):
     calls = []
     monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
@@ -71,23 +65,18 @@ def test_create_project_options(monkeypatch):
     assert calls[-1]["setup_command"] == "npm install"
 
 
-def test_prompt_wait_exits_if_vm_stops_during_setup(monkeypatch):
+def test_create_does_not_wait_for_project_or_prompt(monkeypatch):
     monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
-    monkeypatch.setattr("time.sleep", lambda _: None)
     calls = []
 
     def request(method, path, body=None):
-        calls.append((method, path))
-        return {
-            "id": "vm",
-            "state": "RUNNING" if method == "POST" else "TERMINATED",
-            "project": {"setup_status": "running"},
-        }
+        calls.append((method, path, body))
+        return {"id": None, "state": "CREATING", "status": "preparing"}
 
     monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
     result = CliRunner().invoke(
         app, ["create", "dev", "--agent", "codex", "--setup", "sleep 10", "--prompt", "hello"]
     )
-    assert result.exit_code != 0
-    assert "VM stopped before project setup completed" in result.output
-    assert len(calls) == 2
+    assert result.exit_code == 0, result.output
+    assert "vmnest wait dev" in result.output
+    assert len(calls) == 1 and calls[0][2]["prompt"] == "hello"

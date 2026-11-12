@@ -54,30 +54,22 @@ def test_prompt_file_and_conflict_before_request(monkeypatch, tmp_path):
     assert calls[0][2]["prompt"] == "hello"
 
 
-def test_create_prompt_uses_separate_idempotent_submission(monkeypatch):
-    from agent_sandbox.cli import agent_runs, remote
+def test_create_prompt_is_durable_in_the_single_creation_request(monkeypatch):
+    from agent_sandbox.cli import remote
 
     calls = []
     monkeypatch.setattr(remote, "remote_url", lambda: "https://example.test")
-    monkeypatch.setattr(
-        remote,
-        "request",
-        lambda method, path, body: calls.append((path, body)) or {"id": "vm1", "state": "RUNNING"},
-    )
-    monkeypatch.setattr(
-        agent_runs,
-        "api",
-        lambda method, path, body: (
-            calls.append((path, body)) or {"id": "run1", "status": "starting"}
-        ),
-    )
+
+    def request(method, path, body):
+        calls.append((method, path, body))
+        return {"id": None, "state": "CREATING", "status": "preparing"}
+
+    monkeypatch.setattr(remote, "request", request)
     command = [
         "create",
         "dev",
         "--agent",
         "claude",
-        "--profile",
-        "mail",
         "--prompt",
         "hello",
         "--request-key",
@@ -87,10 +79,10 @@ def test_create_prompt_uses_separate_idempotent_submission(monkeypatch):
     for _ in range(2):
         result = CliRunner().invoke(main_app, command)
         assert result.exit_code == 0, result.output
-        assert json.loads(result.output)["run"]["id"] == "run1"
-    assert calls[0][0] == "/v1/vms"
-    assert calls[1][0] == "/v1/vms/dev/agent/runs"
-    assert calls[1][1]["request_key"] == calls[3][1]["request_key"]
+        assert json.loads(result.output)["status"] == "preparing"
+    assert len(calls) == 2 and calls[0] == calls[1]
+    assert calls[0][1] == "/v1/vms"
+    assert calls[0][2]["prompt"] == "hello" and calls[0][2]["wait"] is False
 
 
 def test_create_validates_prompt_before_creating_vm(monkeypatch):

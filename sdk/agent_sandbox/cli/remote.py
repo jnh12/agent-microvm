@@ -31,14 +31,14 @@ def routed(function):
             name = kwargs.get("name")
             path = vm_path(name) if name else "/v1/vms"
             if operation == "create":
-                from .agent_runs import prompt_text, submit
+                from .agent_runs import prompt_text
 
                 text = None
                 if kwargs.get("prompt") is not None or kwargs.get("prompt_file") is not None:
                     if not kwargs.get("agent"):
                         raise SandboxError("--prompt requires --agent")
                     text = prompt_text(kwargs.get("prompt"), kwargs.get("prompt_file"))
-                body = {"name": name, "request_key": key}
+                body = {"name": name, "request_key": key, "wait": False}
                 for field in ("repository", "setup_command", "idle_minutes"):
                     if kwargs.get(field) is not None:
                         body[field] = kwargs[field]
@@ -56,48 +56,17 @@ def routed(function):
                     if kwargs.get("agent") not in {"codex", "claude"}:
                         raise SandboxError("--profile requires --agent codex or claude")
                     body["profile"] = kwargs["profile"]
-                result = request("POST", "/v1/vms", body)
-                if not result.get("id"):
-                    raise SandboxError(f"Creation is {result['state']}; inspect before proceeding")
                 if text is not None:
-                    import time
-
-                    from .agent_runs import poll_interval
-
-                    while result.get("project") and result["project"]["setup_status"] in (
-                        "pending",
-                        "running",
-                    ):
-                        if result["state"] != "RUNNING":
-                            raise SandboxError(
-                                "VM stopped before project setup completed; "
-                                "inspect it before retrying"
-                            )
-                        time.sleep(poll_interval())
-                        result = request("GET", path)
-                    if result.get("project") and result["project"]["setup_status"] != "ready":
-                        raise SandboxError(
-                            "VM was created but project setup needs attention; "
-                            "inspect it and use vmnest project logs"
-                        )
-                    try:
-                        result["run"] = submit(
-                            name,
-                            text,
-                            request_key="create-"
-                            + __import__("hashlib").sha256(key.encode()).hexdigest(),
-                        )
-                    except Exception as exc:
-                        raise SandboxError(
-                            f"VM {name} was created, but prompt submission failed: {exc}"
-                        ) from None
+                    body["prompt"] = text
+                result = request("POST", "/v1/vms", body)
                 result["request_key"] = key
                 if kwargs.get("as_json"):
                     console.print_json(data=result)
                 else:
-                    console.print(f"Created {name}. Use vmnest open {name} or vmnest exec {name} -- COMMAND.", markup=False)
-                    if result.get("run"):
-                        console.print(f"Run {result['run']['id']}: {result['run']['status']}")
+                    console.print(
+                        f"Creating {name} in the background. Check progress: vmnest wait {name}",
+                        markup=False,
+                    )
                 return
             if operation in {"exec", "run"}:
                 cmd = kwargs.get("cmd")
@@ -140,8 +109,9 @@ def routed(function):
                 table = Table("COMPUTER", "TYPE", "STATUS")
                 for row in result["items"]:
                     table.add_row(
-                        row["name"], (row.get("agent") or {}).get("provider", "Computer"),
-                        row.get("status", row["state"]).replace("_", " ")
+                        row["name"],
+                        (row.get("agent") or {}).get("provider", "Computer"),
+                        row.get("status", row["state"]).replace("_", " "),
                     )
                 console.print(table)
             elif operation == "logs":

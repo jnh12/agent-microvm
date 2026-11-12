@@ -158,3 +158,31 @@ def test_create_idle_option_is_transported(monkeypatch):
     result = runner.invoke(app, ["create", "dev", "--idle-minutes", "0"])
     assert result.exit_code == 0, result.output
     assert calls[0]["idle_minutes"] == 0
+
+
+def test_wait_displays_progress_and_returns_only_when_ready(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    stages = iter(["preparing", "starting", "connecting_agent", "setting_up", "ready"])
+    calls = []
+
+    def request(method, path):
+        calls.append((method, path))
+        return {"name": "dev", "status": next(stages)}
+
+    monkeypatch.setattr("agent_sandbox.cli.computers.request", request)
+    result = runner.invoke(app, ["wait", "dev"])
+    assert result.exit_code == 0, result.output
+    for text in ("Preparing", "Starting", "Connecting agent", "Setting up", "Ready"):
+        assert text in result.output
+    assert len(calls) == 5 and all(c == ("GET", "/v1/vms/dev") for c in calls)
+
+
+def test_wait_failed_startup_is_an_error(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setattr(
+        "agent_sandbox.cli.computers.request",
+        lambda *a: {"name": "dev", "status": "failed", "startup": {"error": "Setup failed"}},
+    )
+    result = runner.invoke(app, ["wait", "dev"])
+    assert result.exit_code != 0 and "Setup failed" in result.output

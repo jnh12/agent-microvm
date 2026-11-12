@@ -9,14 +9,14 @@ Development branch: [remote CLI setup](docs/remote-api.md). The separate
 
 **Isolated AWS microVM sandboxes for AI agents.**
 
-SDK · CLI · MCP server · AWS microVMs
+SDK Â· CLI Â· MCP server Â· AWS microVMs
 
 [![GitHub stars](https://img.shields.io/github/stars/jnh12/agent-microvm?style=flat&color=f6c85f)](https://github.com/jnh12/agent-microvm/stargazers)
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache_2.0-71d6c5)](LICENSE)
 [![PyPI version](https://img.shields.io/pypi/v/vmnest?color=8bb8f8)](https://pypi.org/project/vmnest/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-8bb8f8)](https://www.python.org/downloads/)
 
-[Python setup](#1-install-the-sdkcli) · [Java setup](sdk/java/README.md#install-and-download) · [Demo](#demo) · [MCP setup](#use-it-from-an-ai-agent-mcp) · [Contributing](CONTRIBUTING.md)
+[Python setup](#1-install-the-sdkcli) Â· [Java setup](sdk/java/README.md#install-and-download) Â· [Demo](#demo) Â· [MCP setup](#use-it-from-an-ai-agent-mcp) Â· [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -29,13 +29,13 @@ fast start, a dedicated HTTPS endpoint, and suspend/resume for up to 8 hours.
 
 ## Demo
 
-**Install, configure, provision** — `uv pip install "vmnest[mcp]"`, the whole of
+**Install, configure, provision** â€” `uv pip install "vmnest[mcp]"`, the whole of
 `sandbox.yaml`, then `vmnest infra up` building the MicroVM image and wiring up the
 role and build bucket:
 
 ![Install and provision a sandbox with vmnest](https://raw.githubusercontent.com/jnh12/agent-microvm/main/demo/01-setup.gif)
 
-**Boot a sandbox and serve an app out of it** — `vmnest create` (a ~3 second boot),
+**Boot a sandbox and serve an app out of it** â€” `vmnest create` (a ~3 second boot),
 write a FastAPI app into the VM with `vmnest exec`, start uvicorn, then `vmnest
 forward` the port to localhost and `curl` it:
 
@@ -44,41 +44,41 @@ forward` the port to localhost and `curl` it:
 ## Why agent-microvm?
 
 Agentic workloads run **untrusted, model-generated code**. The agent decides at
-runtime what to execute — shell out, install a package, hit the network — so the
+runtime what to execute â€” shell out, install a package, hit the network â€” so the
 blast radius is unknown ahead of time. Containers share the host kernel; for code
 you didn't write, that boundary is often not strong enough, and standing up your
 own VM fleet to get real isolation is a lot of undifferentiated ops work.
 
 [AWS Lambda MicroVMs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-microvms-guide.html)
 give each sandbox a **Firecracker microVM** with hardware-virtualized, VM-level
-isolation while staying **serverless** — no clusters, nodes, or capacity to
+isolation while staying **serverless** â€” no clusters, nodes, or capacity to
 manage. `vmnest` wraps that backend so an agent can treat a sandbox as
 a disposable tool:
 
-- **Safe by construction** — every command runs in a per-session microVM,
+- **Safe by construction** â€” every command runs in a per-session microVM,
   isolated from the host and from other sessions. Ideal for AI-generated code,
   user submissions, and CI jobs.
-- **Fast and stateful** — snapshot-based fast start, plus suspend/resume for up
+- **Fast and stateful** â€” snapshot-based fast start, plus suspend/resume for up
   to 8 hours, so an agent can pause a long-running session and resume it later
   with memory and disk intact.
-- **Serverless economics** — pay for what you use; no idle VM fleet sitting
+- **Serverless economics** â€” pay for what you use; no idle VM fleet sitting
   between agent runs.
-- **Batteries included** — Python and Java SDKs, the `vmnest` CLI, a per-sandbox
+- **Batteries included** â€” Python and Java SDKs, the `vmnest` CLI, a per-sandbox
   HTTPS endpoint, and a built-in **MCP server** so Claude, Cursor, Goose, and
   other agents can create, run, and manage sandboxes as native tools.
-- **No IaC engine** — infrastructure is provisioned through AWS SDKs and tracked
+- **No IaC engine** â€” infrastructure is provisioned through AWS SDKs and tracked
   in a local state file; nothing else to install or operate.
 
 ### Use cases
 
 **Developer workloads that outgrow the laptop.** Multi-agent orchestration is
-memory-hungry — a handful of concurrent agents, each with its own toolchain and
+memory-hungry â€” a handful of concurrent agents, each with its own toolchain and
 build tree, will exhaust local RAM long before it exhausts your patience. Each
 sandbox gets its own CPU/memory allocation in AWS (`vmnest create app --cpus 2 -m
 2048`), so you scale out by adding microVMs rather than by buying RAM.
 
 **Local coding agents that run unattended.** The agent shells out, installs
-packages, and rewrites files inside the microVM — not on your machine. It can't
+packages, and rewrites files inside the microVM â€” not on your machine. It can't
 touch your home directory, and you don't have to sit there approving each
 command to be sure of that.
 
@@ -86,7 +86,7 @@ command to be sure of that.
 the image. Define a VPC egress connector in `sandbox.yaml` (`network.egress`) and
 every outbound connection leaves through a security group you own, so you decide
 which hosts and ports the workload can reach. Ingress is opt-in per sandbox via
-the SDK's `ingress_network_connectors` (e.g. `SHELL_INGRESS`) — nothing is
+the SDK's `ingress_network_connectors` (e.g. `SHELL_INGRESS`) â€” nothing is
 reachable from outside unless you attach a connector. See
 [Networking](#networking).
 
@@ -106,12 +106,12 @@ memory and disk intact, `vmnest start` resumes, `vmnest rm` tears down. A sessio
 stay alive across up to **8 hours** of work without you paying for it to idle.
 
 **A sandbox per code session.** Named sandboxes are tracked in local state, so
-several concurrent sessions — one per agent, per branch, per experiment — each
+several concurrent sessions â€” one per agent, per branch, per experiment â€” each
 get their own microVM, isolated from one another and independently
 suspendable.
 
 **One image, many VMs.** Build the guest image once (`vmnest image build ./guest`),
-then create as many microVMs from it as you need — different workloads, same
+then create as many microVMs from it as you need â€” different workloads, same
 reproducible base, no rebuild per sandbox.
 
 **One command to stand up the backend.** `vmnest infra up` provisions the MicroVM
@@ -154,7 +154,7 @@ The `vmnest` CLI and MCP server are distributed with the Python package.
 | Component | Description |
 | --- | --- |
 | Runtime | AWS Lambda MicroVMs (managed Firecracker) via the AWS SDK for Python or Java |
-| Guest agent | `guest/agentd` — FastAPI **agentd** (exec/fs API on port 8080) plus a **lifecycle-hook** server (port 9000), run together via `agentd.serve` and baked into the MicroVM image |
+| Guest agent | `guest/agentd` â€” FastAPI **agentd** (exec/fs API on port 8080) plus a **lifecycle-hook** server (port 9000), run together via `agentd.serve` and baked into the MicroVM image |
 | SDKs | Python: `agent_sandbox.Sandbox`; Java: `io.github.jnh12.vmnest.Sandbox` |
 | Transport | Both SDKs use HTTPS + `X-aws-proxy-auth` through their `AgentClient` |
 | CLI | `vmnest` |
@@ -189,7 +189,7 @@ graph TD
 - Docker (only to test the guest image locally; the build itself happens in AWS)
 - A region where Lambda MicroVMs is available: `us-east-1`, `us-east-2`, `us-west-2`, `eu-west-1`, `ap-northeast-1`. Pick any of these via `region:` in `sandbox.yaml` or the standard `AWS_DEFAULT_REGION` / `AWS_REGION` environment variable.
 
-No IaC engine or external CLI is required — `vmnest infra` provisions everything
+No IaC engine or external CLI is required â€” `vmnest infra` provisions everything
 with `boto3` (a core dependency) and tracks state in a local JSON file.
 
 ## 1. Install the SDK/CLI
@@ -200,7 +200,7 @@ The package is published on PyPI as **`vmnest`** (Python import: `agent_sandbox`
 
 ```bash
 pip install vmnest            # SDK + CLI + infra (PyYAML is a base dependency)
-pip install "vmnest[mcp]"     # + MCP server (FastMCP) — see the MCP section below
+pip install "vmnest[mcp]"     # + MCP server (FastMCP) â€” see the MCP section below
 pip install "vmnest[isal]"    # + faster ISA-L guest-image zipping (optional accelerator)
 ```
 
@@ -221,7 +221,7 @@ uv sync --extra isal    # + faster ISA-L guest-image zipping
 This installs the `vmnest` command on your `PATH`. Verify with `vmnest --help`.
 
 > Infrastructure support (`vmnest infra`, reading `sandbox.yaml`) is included in the
-> base install — no extra needed. The legacy `[infra]` extra still resolves but
+> base install â€” no extra needed. The legacy `[infra]` extra still resolves but
 > is now an empty no-op.
 
 ## 2. Configure and deploy the infrastructure
@@ -277,13 +277,13 @@ image version even when one is already active.
 
 `vmnest infra output` prints the current stack's outputs labeled with their
 `project`/`stack` (empty `{}` when nothing is provisioned or after `destroy`).
-With several `sandbox.yaml` files — one project each — pick one with
+With several `sandbox.yaml` files â€” one project each â€” pick one with
 `-f <file>` / `-s <stack>`, or list them all with `vmnest infra output --all`.
 
 ### State file (no account or token required)
 
-`vmnest infra` records what it created — and whether each resource was created by
-it (managed) versus reused from your `sandbox.yaml` — in a local JSON file at
+`vmnest infra` records what it created â€” and whether each resource was created by
+it (managed) versus reused from your `sandbox.yaml` â€” in a local JSON file at
 `~/.agent_sandbox/infra-state.json` (override with `AGENT_SANDBOX_INFRA_STATE`).
 `vmnest infra destroy` only tears down resources it manages, so reused resources
 are left untouched. This file also holds the outputs (`image_arn`,
@@ -342,7 +342,7 @@ vmnest stop app                      # suspend (memory/disk preserved)
 vmnest start app                     # resume
 vmnest rm app                        # terminate + drop from local state
 
-# ephemeral one-shot (image ARN is a required positional — not auto-wired)
+# ephemeral one-shot (image ARN is a required positional â€” not auto-wired)
 vmnest run "$(vmnest infra output image_arn)" -- python -c "print('one-shot')"
 
 # serve a port from inside the sandbox on localhost (see section 5)
@@ -370,18 +370,18 @@ vmnest mcp
 - `vmnest image ls`: `--managed` (AWS base images), `--json` (raw output).
 - `vmnest forward`: `--remote-port/-r` (required), `--local-port/-l`,
   `--no-verify-tls`, `--poll-interval`. The reserved lifecycle-hook port
-  (`AGENT_SANDBOX_HOOK_PORT`, default `9000`) is rejected — see
+  (`AGENT_SANDBOX_HOOK_PORT`, default `9000`) is rejected â€” see
   [Guest agent & lifecycle hooks](#guest-agent--lifecycle-hooks).
 - `vmnest infra up`: `--file/-f` is repeatable and accepts directories
   (multi-project), plus `--stack/-s`, `--rebuild`, `--parallelism/-p`.
 
-`vmnest create` resolves image/role from the flag → env var
-(`AGENT_SANDBOX_IMAGE_ARN` / `AGENT_SANDBOX_EXECUTION_ROLE_ARN`) → `vmnest infra`
+`vmnest create` resolves image/role from the flag â†’ env var
+(`AGENT_SANDBOX_IMAGE_ARN` / `AGENT_SANDBOX_EXECUTION_ROLE_ARN`) â†’ `vmnest infra`
 outputs, in that order, so after `vmnest infra up` most commands need no flags.
 `vmnest run` is the exception: it takes the image ARN as a required positional
 argument and is **not** auto-wired.
 
-The CLI keeps a local name → MicroVM map at `~/.agent_sandbox/state.json`
+The CLI keeps a local name â†’ MicroVM map at `~/.agent_sandbox/state.json`
 (override with `AGENT_SANDBOX_STATE`), since AWS has no concept of sandbox names.
 
 > `image inspect` and `image prune` are available only as **MCP tools**, not as
@@ -430,7 +430,7 @@ outputs, so **most setups need no environment variables at all**. The two below
 are the only values that must be resolvable; everything else is an optional
 override.
 
-**Required** — each needs *one of*: a CLI flag, an environment variable, or an
+**Required** â€” each needs *one of*: a CLI flag, an environment variable, or an
 `vmnest infra up` output (auto-wired). After `vmnest infra up` both are auto-wired.
 
 | Variable | Purpose |
@@ -447,16 +447,16 @@ region must be one where Lambda MicroVMs is available (see Prerequisites).
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `AGENT_SANDBOX_REGION` | boto3 default | Region for SDK / MCP calls |
-| `AGENT_SANDBOX_STATE` | `~/.agent_sandbox/state.json` | CLI name → MicroVM map |
+| `AGENT_SANDBOX_STATE` | `~/.agent_sandbox/state.json` | CLI name â†’ MicroVM map |
 | `AGENT_SANDBOX_INFRA_STATE` | `~/.agent_sandbox/infra-state.json` | `vmnest infra` state file |
-| `AGENT_SANDBOX_SETUP` | `sandbox.yaml` | Infra config path (search order: `$AGENT_SANDBOX_SETUP` → `sandbox.yaml` → legacy `setup.yaml`) |
+| `AGENT_SANDBOX_SETUP` | `sandbox.yaml` | Infra config path (search order: `$AGENT_SANDBOX_SETUP` â†’ `sandbox.yaml` â†’ legacy `setup.yaml`) |
 | `AGENT_SANDBOX_EGRESS_CONNECTOR` | from infra output | VPC egress network connector ARN to attach |
 | `AGENT_SANDBOX_WORKDIR` | `/work` | Default working directory inside the VM |
 | `AGENT_SANDBOX_VERIFY_TLS` | `1` | Set `0` to skip TLS verification to the MicroVM endpoint (debug only) |
 | `AGENT_SANDBOX_AGENT_PORT` | `8080` | agentd application port the SDK scopes auth tokens to (must match the guest's `AGENTD_PORT`) |
 | `AGENT_SANDBOX_HOOK_PORT` | `9000` | Reserved lifecycle-hook port; `vmnest forward` refuses it (must match the guest's `AGENTD_HOOK_PORT`) |
 
-The MCP server adds a further set of `AGENT_SANDBOX_MCP_*` tuning knobs —
+The MCP server adds a further set of `AGENT_SANDBOX_MCP_*` tuning knobs â€”
 see [Configuration](#configuration) under the MCP section below.
 
 ## Use it from an AI agent (MCP)
@@ -470,7 +470,7 @@ implemented in Python with **FastMCP** on top of the `agent_sandbox` SDK.
 
 ### Installation
 
-The MCP server ships in the optional **`mcp` extra**. It **must** be installed —
+The MCP server ships in the optional **`mcp` extra**. It **must** be installed â€”
 without it `vmnest mcp` exits immediately and the client reports
 **"Failed to connect"**. Install it one of these ways:
 
@@ -487,11 +487,11 @@ uv sync --extra mcp
 # or, with pip: pip install -e '.[mcp]'
 ```
 
-**Global tool (so `vmnest` is on your `PATH` everywhere)** — include the `[mcp]`
+**Global tool (so `vmnest` is on your `PATH` everywhere)** â€” include the `[mcp]`
 extra:
 
 ```bash
-# from a source checkout (editable — tracks your working tree):
+# from a source checkout (editable â€” tracks your working tree):
 uv tool install --editable ".[mcp]" --force
 # or from PyPI (published as `vmnest`):
 uv tool install "vmnest[mcp]"
@@ -499,28 +499,28 @@ uv tool install "vmnest[mcp]"
 
 > **Gotcha:** keep the `[mcp]` extra every time you (re)install the global tool.
 > `uv tool install --reinstall .` **without** `[mcp]` drops the `mcp` package and
-> breaks `vmnest mcp` — re-run the command above with `".[mcp]"` to fix it.
+> breaks `vmnest mcp` â€” re-run the command above with `".[mcp]"` to fix it.
 
 Verify it's installed and reachable:
 
 ```bash
 vmnest mcp     # starts the stdio server (Ctrl+C to stop). An "mcp not available"
-            # message instead means the [mcp] extra is missing — see above.
-which vmnest   # e.g. ~/.local/bin/vmnest — use this absolute path if your MCP client
+            # message instead means the [mcp] extra is missing â€” see above.
+which vmnest   # e.g. ~/.local/bin/vmnest â€” use this absolute path if your MCP client
             # runs in a different environment and can't find vmnest on its PATH.
 ```
 
 Provision the backend first (`vmnest infra up`) so image/role ARNs resolve, or set
 `AGENT_SANDBOX_IMAGE_ARN` / `AGENT_SANDBOX_EXECUTION_ROLE_ARN` (see
-[Environment variables](#environment-variables)) — otherwise the client connects
+[Environment variables](#environment-variables)) â€” otherwise the client connects
 but tool calls error at runtime.
 
-The server runs over stdio and can be launched three ways — use whichever your
+The server runs over stdio and can be launched three ways â€” use whichever your
 client makes easiest:
 
-- `vmnest mcp` — via the bundled CLI (recommended).
-- `vmnest-mcp` — the standalone console script (same server).
-- `python -m agent_sandbox_mcp` — module form, handy when `vmnest` isn't on `PATH`.
+- `vmnest mcp` â€” via the bundled CLI (recommended).
+- `vmnest-mcp` â€” the standalone console script (same server).
+- `python -m agent_sandbox_mcp` â€” module form, handy when `vmnest` isn't on `PATH`.
 
 All the client snippets below use `vmnest mcp`. If your MCP client runs in a
 different environment than your shell (so `vmnest` isn't on its `PATH`), swap in the
@@ -534,7 +534,7 @@ already exported, as shown in the generic example.
 claude mcp add agent-sandbox -- vmnest mcp
 ```
 
-**Claude Desktop** — add to `claude_desktop_config.json` (macOS:
+**Claude Desktop** â€” add to `claude_desktop_config.json` (macOS:
 `~/Library/Application Support/Claude/`, Windows: `%APPDATA%\Claude\`):
 
 ```json
@@ -548,7 +548,7 @@ claude mcp add agent-sandbox -- vmnest mcp
 }
 ```
 
-**Cursor** — add to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project):
+**Cursor** â€” add to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project):
 
 ```json
 {
@@ -561,7 +561,7 @@ claude mcp add agent-sandbox -- vmnest mcp
 }
 ```
 
-**VS Code** — add to `.vscode/mcp.json`:
+**VS Code** â€” add to `.vscode/mcp.json`:
 
 ```json
 {
@@ -574,11 +574,11 @@ claude mcp add agent-sandbox -- vmnest mcp
 }
 ```
 
-**Windsurf** — add to `~/.codeium/windsurf/mcp_config.json` (same `mcpServers`
+**Windsurf** â€” add to `~/.codeium/windsurf/mcp_config.json` (same `mcpServers`
 shape as Cursor/Claude Desktop above).
 
-**Goose** — Goose uses a YAML config. Either run `goose configure` → *Add
-Extension* → *Command-line Extension* and enter `vmnest mcp`, or add an entry to
+**Goose** â€” Goose uses a YAML config. Either run `goose configure` â†’ *Add
+Extension* â†’ *Command-line Extension* and enter `vmnest mcp`, or add an entry to
 `~/.config/goose/config.yaml`:
 
 ```yaml
@@ -590,7 +590,7 @@ extensions:
     args: [mcp]
 ```
 
-**pi / any other stdio client** — most clients share the same shape. This
+**pi / any other stdio client** â€” most clients share the same shape. This
 generic block also shows wiring the required ARNs via `env` when they aren't
 exported in the client's environment:
 
@@ -703,7 +703,7 @@ The server reuses the SDK/CLI variables from
 [Environment variables](#environment-variables) (image/role ARN, region, egress
 connector, TLS, workdir) and adds these MCP-specific tuning knobs. If you run a
 **custom guest image**, also see
-[Bring your own guest image → If you use MCP](#if-you-use-mcp-with-a-custom-image)
+[Bring your own guest image â†’ If you use MCP](#if-you-use-mcp-with-a-custom-image)
 for the env values the MCP process must resolve independently:
 
 | Env var | Default | Description |
@@ -729,19 +729,19 @@ microsandbox-mcp operations are not implemented by this repository's MCP server,
 Python SDK, or Java SDK. The limitations come from a combination of the available
 AWS APIs and the current guest implementation:
 
-- **Volumes** (`volume_*`) — no named-volume management API in the SDKs or
+- **Volumes** (`volume_*`) â€” no named-volume management API in the SDKs or
   [AWS Lambda MicroVMs API](https://docs.aws.amazon.com/lambda/latest/microvm-api/API_Operations.html).
-- **User-managed snapshots** (`snapshot_*`) — no API here to capture a running
+- **User-managed snapshots** (`snapshot_*`) â€” no API here to capture a running
   sandbox as a named snapshot and restore or clone it later. AWS does use
   [image-build snapshots](https://docs.aws.amazon.com/lambda/latest/dg/microvms-images-snapshots.html)
   and preserves memory and disk during suspend/resume; those are distinct features.
-- **SSH / SFTP tools** (`sandbox_ssh_*`, `sandbox_sftp_*`) — no SSH/SFTP client
+- **SSH / SFTP tools** (`sandbox_ssh_*`, `sandbox_sftp_*`) â€” no SSH/SFTP client
   integration in the SDKs or MCP server, and the bundled guest does not configure
   an SSH server. AWS separately supports
   [interactive shell authentication](https://docs.aws.amazon.com/lambda/latest/microvm-api/API_CreateMicrovmShellAuthToken.html)
   with `SHELL_INGRESS`; this is not an implementation of these MCP tools.
 - **Streaming exec sessions** (`sandbox_exec_start` / `_poll` / `_write_stdin` /
-  `_signal` / `_close`) and `sandbox_drain` — `agentd`'s `/v1/exec` returns output
+  `_signal` / `_close`) and `sandbox_drain` â€” `agentd`'s `/v1/exec` returns output
   after a command completes or times out. It has no session handles, interactive
   stdin, or incremental output API. Supporting these operations through `agentd`
   requires guest and client changes. This does not preclude AWS's separate
@@ -759,9 +759,9 @@ AGENT_SANDBOX_MCP_E2E=1 uv run python tests/mcp/e2e.py   # live e2e (needs infra
 
 The guest image runs **two servers in one process** (`python -m agentd.serve`):
 
-- **agentd** on port `8080` — the application API (`/v1/exec`, `/v1/fs/*`,
+- **agentd** on port `8080` â€” the application API (`/v1/exec`, `/v1/fs/*`,
   `/healthz`) the SDK/CLI reach through the MicroVM's auth-token proxy.
-- **lifecycle hooks** on port `9000` — called **only by the AWS Lambda MicroVMs
+- **lifecycle hooks** on port `9000` â€” called **only by the AWS Lambda MicroVMs
   platform** (never by your clients) at image build and MicroVM state
   transitions.
 
@@ -769,7 +769,7 @@ The hooks make sandboxes faster and safer with no action on your part:
 
 | Hook | When | What it does for you |
 | --- | --- | --- |
-| `/ready` | during image build, before the snapshot | waits until agentd is fully serving, so the snapshot captures a ready agent — no first-`exec` race, faster starts |
+| `/ready` | during image build, before the snapshot | waits until agentd is fully serving, so the snapshot captures a ready agent â€” no first-`exec` race, faster starts |
 | `/validate` | after build, on a test VM | smoke-tests the snapshot so a broken image fails the build instead of shipping |
 | `/run` | once per VM, on start from snapshot | mints a fresh per-VM identity and reseeds randomness (fixes the shared-snapshot uniqueness pitfall) |
 | `/resume` | after `vmnest start` (resume) | reseeds randomness / refreshes per-VM state |
@@ -779,14 +779,14 @@ The hooks make sandboxes faster and safer with no action on your part:
 Hooks are baked into the image at build time, so **rebuild to pick them up on an
 existing stack**: `vmnest infra up --rebuild`.
 
-**The hook port is reserved.** `vmnest forward` refuses `--remote-port 9000` — the
+**The hook port is reserved.** `vmnest forward` refuses `--remote-port 9000` â€” the
 lifecycle plane is the platform's private channel and must never be
 client-reachable, and auth tokens are scoped to the app port only.
 
 **Ports are configurable** (defaults `8080` / `9000`). Override the guest with
 `AGENTD_PORT` / `AGENTD_HOOK_PORT` (baked via the Dockerfile) and the SDK/CLI with
 the matching `AGENT_SANDBOX_AGENT_PORT` / `AGENT_SANDBOX_HOOK_PORT`. Keep the two
-hook-port values in sync — the SDK tells the platform which port to call, and the
+hook-port values in sync â€” the SDK tells the platform which port to call, and the
 guest must bind the same one.
 
 ## Bring your own guest image
@@ -795,7 +795,7 @@ You don't have to use the bundled guest. `vmnest image build ./my-guest` (or
 `image.guest_dir` in `sandbox.yaml`) accepts any directory with a `Dockerfile`.
 But the SDK, `vmnest` CLI, **and the MCP server** all reach into the VM through the
 same small HTTP agent (`agentd`), so a custom image must honor that contract or
-`exec`/`fs` — and therefore **every MCP `sandbox_*` tool** — will fail to
+`exec`/`fs` â€” and therefore **every MCP `sandbox_*` tool** â€” will fail to
 connect. To keep a custom image working:
 
 1. **Serve the agentd API on the agent port.** Your image must answer
@@ -805,16 +805,16 @@ connect. To keep a custom image working:
    image and keep its `CMD` (`python -m agentd.serve`).
 2. **Keep the agent port aligned on both sides.** The guest binds `AGENTD_PORT`;
    the SDK/CLI/MCP scope auth tokens to `AGENT_SANDBOX_AGENT_PORT`. If you change
-   one, change the other — a mismatch means the proxy can't route to your agent.
+   one, change the other â€” a mismatch means the proxy can't route to your agent.
 3. **Lifecycle hooks are opt-in.** To keep them, run `agentd.serve` (it starts
    the hook server too), `EXPOSE` + bind `AGENTD_HOOK_PORT` (default `9000`), keep
    `AGENT_SANDBOX_HOOK_PORT` in sync, and build with `--hooks`
-   (`vmnest infra up` does this). Drop them and the sandbox still works — you just
+   (`vmnest infra up` does this). Drop them and the sandbox still works â€” you just
    lose the faster-start / per-VM-uniqueness benefits (see above).
 
 ### If you use MCP with a custom image
 
-The MCP server runs as its **own process**, launched by your MCP client — it does
+The MCP server runs as its **own process**, launched by your MCP client â€” it does
 **not** inherit your shell's environment. So any value you overrode for the guest
 must *also* be resolvable in the MCP process, wired through the client's `env`
 block (see the config examples under
@@ -863,7 +863,7 @@ up a dev environment, run the tests and linter, and open a pull request.
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Apache-2.0 â€” see [LICENSE](LICENSE).
 
 ### Hosted agent logins
 
@@ -989,3 +989,26 @@ Input history stays in memory, not on disk. Chat displays the five latest comple
 runs plus active runs; `--history 0` hides completed history and `--history N`
 changes that amount. Disconnected output polling retries reads, never resubmits
 prompts. Piped input uses a plain fallback without terminal control sequences.
+
+
+### Background creation
+
+Hosted `create` returns after the server durably accepts the request. Startup,
+agent credential/configuration injection and project setup continue on the server.
+It reports acceptance, not a claim that the computer is already ready.
+
+```sh
+vmnest create dev --agent codex --prompt "Describe the project"
+vmnest wait dev
+vmnest inspect dev
+```
+
+`wait` shows startup phase changes until ready, or exits with an error if startup
+fails. `--timeout SECONDS` changes its 300-second wait limit; timing out does not
+cancel creation. `--json` returns the final status object. `VMNEST_WAIT_POLL_SECONDS`
+controls polling (default 1). `inspect` and `ls` show current status without waiting.
+Exec, file access, forwarding and chat still wait for readiness before using the VM.
+The initial `--prompt` is saved in the same creation request and submitted once by
+the backend after successful setup, even if the CLI exits. `wait` waits for computer
+readiness and prompt submission, not completion of the agent's reply.
+Self-hosted creation is unchanged.

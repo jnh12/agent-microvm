@@ -15,6 +15,7 @@ HOSTED = {
     "agent",
     "project",
     "open",
+    "wait",
 }
 DIRECT = {"infra", "image", "mcp", "start", "stop", "rm"}
 DIRECT_OPTIONS = {

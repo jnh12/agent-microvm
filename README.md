@@ -947,8 +947,8 @@ Create once, then use `vmnest open NAME`, `vmnest exec NAME -- COMMAND`, or
 After 15 minutes idle, the service saves before shutting down compute. Active agent
 work, guest background jobs, and connection leases keep it awake.
 
-`vmnest create dev --idle-minutes 30` changes the idle interval; `0` disables
-service-managed idle shutdown. `--disposable` discards guest state on shutdown.
+`vmnest create dev --idle-minutes 5` selects a shorter idle interval.
+The maximum and default are 15 minutes; disabling idle shutdown is not allowed. `--disposable` discards guest state on shutdown.
 Files in `/workspace` and `/home/agent` persist; RAM, running processes, and system
 changes outside these folders do not. Use saved `--setup` for system dependencies.
 Checkpoint, restore, and workspace-management commands are no longer part of the CLI.

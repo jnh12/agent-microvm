@@ -155,9 +155,9 @@ def test_create_idle_option_is_transported(monkeypatch):
         return {"name": "dev", "id": "test", "state": "RUNNING"}
 
     monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
-    result = runner.invoke(app, ["create", "dev", "--agent", "none", "--idle-minutes", "0"])
+    result = runner.invoke(app, ["create", "dev", "--agent", "none", "--idle-minutes", "5"])
     assert result.exit_code == 0, result.output
-    assert calls[0]["idle_minutes"] == 0
+    assert calls[0]["idle_minutes"] == 5
 
 
 def test_wait_displays_progress_and_returns_only_when_ready(monkeypatch):

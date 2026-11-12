@@ -174,7 +174,7 @@ def _print_exec(result) -> None:
 @app.command()
 @routed
 def create(
-    idle_minutes: float | None = typer.Option(None, "--idle-minutes", min=0, help="Hosted idle shutdown; default 15 minutes, 0 keeps awake."),
+    idle_minutes: float | None = typer.Option(None, "--idle-minutes", min=0.001, max=15, help="Hosted idle shutdown in minutes; maximum and default 15."),
     repository: str | None = typer.Option(
         None, "--repo", help="HTTPS Git repository to clone into /workspace/project."
     ),

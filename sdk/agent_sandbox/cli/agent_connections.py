@@ -21,6 +21,41 @@ register_runs(app)
 Provider = Literal["codex", "claude"]
 
 
+@app.command("default")
+@handled
+def default_agent(
+    provider: Literal["codex", "claude", "auto"] | None = typer.Argument(None),
+    as_json: bool = typer.Option(False, "--json"),
+):
+    """Show or set this CLI's default agent; auto uses the sole connected provider."""
+    from agent_sandbox.accounts import read_config, save_config
+
+    from .agent_defaults import resolve_agent, saved_default
+
+    if provider is not None:
+        if provider != "auto":
+            result = api("GET", "/v1/agent-connections")
+            if provider not in {item["provider"] for item in result["items"]}:
+                raise AccountError(
+                    "NOT_CONNECTED", f"Connect {provider} before making it the default."
+                )
+        config = read_config()
+        defaults = config.setdefault("agent_defaults", {})
+        if provider == "auto":
+            defaults.pop(service_url(), None)
+        else:
+            defaults[service_url()] = provider
+        save_config(config)
+    saved = saved_default()
+    effective = resolve_agent(None, api)
+    result = {"default": saved or "auto", "agent": effective}
+    typer.echo(
+        json.dumps(result)
+        if as_json
+        else (f"Default agent: {saved or 'auto'} (creates: {effective or 'plain computer'}).")
+    )
+
+
 def credential_path(provider):
     if provider == "codex":
         return Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "auth.json"

@@ -869,6 +869,14 @@ Apache-2.0 â€” see [LICENSE](LICENSE).
 
 `vmnest agent connect` discovers supported local, OS-keychain, and WSL logins and lets you select a provider/source. Use `--provider codex --source local --no-integrations --yes` for unattended setup, and `--replace` to reconnect. `vmnest agent status --json` shows cloud connection metadata; `vmnest agent disconnect --provider codex` removes it.
 
+Set a local CLI default with `vmnest agent default codex` (or `claude`).
+`vmnest agent default` shows the preference; `vmnest agent default auto` clears it.
+Without a saved default, `create` automatically uses the only connected provider.
+With zero or multiple providers it creates a plain computer. Explicit `--agent codex`
+or `--agent claude` overrides the default; `--agent none` always creates a plain computer.
+Defaults are saved on this machine per service URL, and also apply to `create --prompt`
+and `create --profile`. A disconnected saved default must be reconnected or cleared.
+
 `vmnest create NAME --agent codex` (or `claude`) requests the hosted agent image and automatic credential setup. These flags require a matching hosted service. Self-hosted users continue selecting their own `--image`. Agent credentials are installed for `/home/agent`; existing exec runs as root, so run the runtime as `runuser -u agent -- codex ...`. No agent chat/task commands are included.
 
 

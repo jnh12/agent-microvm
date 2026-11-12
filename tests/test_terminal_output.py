@@ -155,7 +155,7 @@ def test_create_idle_option_is_transported(monkeypatch):
         return {"name": "dev", "id": "test", "state": "RUNNING"}
 
     monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
-    result = runner.invoke(app, ["create", "dev", "--idle-minutes", "0"])
+    result = runner.invoke(app, ["create", "dev", "--agent", "none", "--idle-minutes", "0"])
     assert result.exit_code == 0, result.output
     assert calls[0]["idle_minutes"] == 0
 

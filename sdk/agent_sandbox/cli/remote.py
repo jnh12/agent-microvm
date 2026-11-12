@@ -31,8 +31,10 @@ def routed(function):
             name = kwargs.get("name")
             path = vm_path(name) if name else "/v1/vms"
             if operation == "create":
+                from .agent_defaults import resolve_agent
                 from .agent_runs import prompt_text
 
+                kwargs["agent"] = resolve_agent(kwargs.get("agent"), request)
                 text = None
                 if kwargs.get("prompt") is not None or kwargs.get("prompt_file") is not None:
                     if not kwargs.get("agent"):

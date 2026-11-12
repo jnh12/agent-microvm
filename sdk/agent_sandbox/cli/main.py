@@ -197,7 +197,10 @@ def create(
     profile: str | None = typer.Option(
         None, "--profile", help="Saved hosted Codex integration profile."
     ),
-    agent: str | None = typer.Option(None, "--agent", help="Hosted agent image: codex or claude."),
+    agent: str | None = typer.Option(
+        None, "--agent",
+        help="Hosted agent: codex, claude, or none. Uses your default or sole connection.",
+    ),
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
     cpus: int = typer.Option(1, "--cpus", help="vCPU count."),
     memory: int = typer.Option(512, "--memory", "-m", help="Memory in MB."),

@@ -11,7 +11,6 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.patch_stdout import patch_stdout
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.text import Text
 
 from agent_sandbox.accounts import AccountError
 
@@ -33,12 +32,14 @@ class EventRenderer:
     def __init__(self, console=None):
         self.console = console or Console(highlight=False)
         self.streaming = False
+        self.pending_text = ""
         self.approvals = set()
 
     def end_stream(self):
         if self.streaming:
-            self.console.print()
+            text, self.pending_text = self.pending_text, ""
             self.streaming = False
+            self.reply(text)
 
     def reply(self, text):
         if text:
@@ -61,10 +62,10 @@ class EventRenderer:
             details(message, title="Approval requested")
             self.console.print(f"/allow {identifier}  or  /deny {identifier}", markup=False)
         elif message.get("method") == "item/agentMessage/delta":
-            if not self.streaming:
-                self.console.print("\nAgent", style="bold green")
-                self.streaming = True
-            self.console.print(Text(message.get("params", {}).get("delta", "")), end="")
+            # patch_stdout cannot safely redraw partial Rich writes around editable input.
+            # Publish complete messages atomically, preserving Markdown and links.
+            self.streaming = True
+            self.pending_text += message.get("params", {}).get("delta", "")
         elif message.get("type") == "assistant":
             self.end_stream()
             for part in message.get("message", {}).get("content", []):
@@ -78,6 +79,7 @@ class EventRenderer:
             item = message.get("params", {}).get("item", {})
             if item.get("type") == "agentMessage" and message["method"] == "item/completed":
                 if self.streaming:
+                    self.pending_text = item.get("text") or self.pending_text
                     self.end_stream()
                 else:
                     self.reply(item.get("text", ""))

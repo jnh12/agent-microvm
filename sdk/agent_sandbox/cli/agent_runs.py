@@ -55,6 +55,8 @@ def submit(name, text, session="main", queue=False, request_key=None, model=None
             },
         )
     except AccountError as exc:
+        if exc.code in {"AGENT_BUSY", "VM_BUSY", "VM_SAVING", "AGENT_NOT_READY", "PROJECT_NOT_READY", "VM_NOT_RUNNING"}:
+            raise
         raise AccountError(
             exc.code, str(exc) + " Request key: " + key + ". Reuse it when retrying."
         ) from None

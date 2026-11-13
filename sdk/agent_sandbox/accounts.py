@@ -154,6 +154,15 @@ class AccountClient:
                     code = "SERVICE_ERROR"
                 # Avoid printing arbitrary provider/proxy responses or secrets.
                 messages = {
+                    "AGENT_BUSY": "The agent is still working, or its queue is paused.",
+                    "VM_BUSY": "The computer is busy with another operation. Try again shortly.",
+                    "VM_SAVING": "The computer is saving or waking. Try again shortly.",
+                    "VM_NOT_RUNNING": "The computer is not running. Open it and try again.",
+                    "AGENT_NOT_READY": "The agent is not ready yet. Try again shortly.",
+                    "PROJECT_NOT_READY": "Project setup is not ready yet.",
+                    "COMPUTER_STARTING": "The computer is still waking. Retry with the same request key.",
+                    "REQUEST_CONFLICT": "This request key was already used for different input.",
+
                     "DISCOVERY_UNAVAILABLE": "Integration discovery is unavailable; retry later or contact the operator.",
                     "CONNECTION_CHANGED": "The agent connection changed. Try again.",
                     "AGENT_NOT_CONNECTED": "Connect your Codex account first.",

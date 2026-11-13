@@ -11,8 +11,6 @@ uv sync
 uv run vmnest setup --mode hosted --url https://api.vmnest.cc
 uv run vmnest login
 uv run vmnest whoami
-uv run vmnest usage
-uv run vmnest usage --json
 ```
 
 An existing global `vmnest` executable may belong to a different release. In the
@@ -20,12 +18,6 @@ tested Windows environment it was version 0.3.0, defaulted to the website origin
 and returned website HTML on API calls. Installing this branch as the normal CLI
 and simplifying hosted defaults remain follow-up work; no package release is made
 by pushing this feature branch.
-
-Usage is calculated by the service, scoped to the signed-in account, and defaults
-to the current UTC month. Use `--from` and `--to` with timezone-aware ISO timestamps
-for another period. Running and suspended times are observation-based estimates;
-long gaps are reported as unknown and history before tracking is unavailable.
-Usage adds no billing or account limits.
 
 ## Verified and outstanding
 

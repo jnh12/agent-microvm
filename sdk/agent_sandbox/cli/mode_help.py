@@ -11,7 +11,6 @@ HOSTED = {
     "login",
     "logout",
     "whoami",
-    "usage",
     "agent",
     "project",
     "open",

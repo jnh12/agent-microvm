@@ -19,7 +19,7 @@ def test_root_switches_without_mutation(monkeypatch):
     for selected in ("hosted", "self-hosted", "hosted"):
         text = help_text(monkeypatch, selected)
         assert "create" in text and "upload" in text and "setup" in text
-        for name in ("agent", "project", "usage", "open", "wait", "login"):
+        for name in ("agent", "project", "open", "wait", "login"):
             assert (re.search(r"\u2502\s+" + re.escape(name) + r"\s{2,}", text) is not None) == (
                 selected == "hosted"
             )

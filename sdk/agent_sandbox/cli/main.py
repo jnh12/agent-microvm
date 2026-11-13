@@ -29,7 +29,6 @@ from .output import details
 from .projects import app as project_app
 from .remote import register_files, routed
 from .state import SandboxRecord, StateStore
-from .usage import register as register_usage
 
 app = ModeApp(
     cls=ModeGroup,
@@ -51,7 +50,6 @@ infra_app = typer.Typer(
 app.add_typer(infra_app)
 register_files(app)
 register_accounts(app)
-register_usage(app)
 register_computers(app)
 
 

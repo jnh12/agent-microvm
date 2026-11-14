@@ -8,7 +8,7 @@ import sys
 import time
 import webbrowser
 from functools import wraps
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 import typer
 
@@ -17,6 +17,7 @@ from agent_sandbox.accounts import (
     AccountError,
     credential_store,
     mode,
+    normalize_url,
     read_config,
     save_config,
     secret,
@@ -33,7 +34,7 @@ def emit(value, as_json):
     elif value.get("status") == "signed_out":
         typer.echo("Signed out.")
     elif value.get("status") == "pending":
-        typer.echo("Waiting for GitHub approval. Run vmnest login --resume to check again.")
+        typer.echo("Waiting for approval. Run vmnest login --resume to check again.")
     else:
         typer.echo(f"Mode: {value.get('mode', 'unconfigured')}")
         if value.get("aws_account"):
@@ -97,6 +98,12 @@ def validate_pending(value):
 
 
 def browser_url(pending, origin):
+    if pending.get("flow") == "website":
+        website = normalize_url(pending.get("website_url", "https://vmnest.cc"))
+        key = pending.get("request")
+        if not isinstance(key, str) or not 32 <= len(key) <= 256:
+            raise AccountError("LOGIN_INVALID", "Invalid website login request.")
+        return website + "/login?" + urlencode({"cli": key})
     if pending.get("flow") != "browser":
         return "https://github.com/login/device"
     value = pending.get("verification_uri", "")
@@ -129,7 +136,9 @@ def register(app: typer.Typer):
         if selected_mode is None:
             if as_json or not sys.stdin.isatty():
                 raise AccountError("MODE_REQUIRED", "Pass --mode hosted or --mode self-hosted.")
-            typer.echo("1. Hosted: sign in with GitHub\n2. Self-hosted: use your AWS account")
+            typer.echo(
+                "1. Hosted: sign in or create an account\n2. Self-hosted: use your AWS account"
+            )
             choice = typer.prompt("Choose", default="1")
             selected_mode = {"1": "hosted", "2": "self-hosted"}.get(choice, choice)
         if selected_mode not in ("hosted", "self-hosted"):
@@ -156,12 +165,15 @@ def register(app: typer.Typer):
     @handled
     def login(
         url: str | None = typer.Option(None, "--url"),
+        website: str | None = typer.Option(
+            None, "--website", help="Website origin; use a loopback URL for local development."
+        ),
         no_browser: bool = typer.Option(False, "--no-browser"),
         device: bool = typer.Option(False, "--device"),
         resume: bool = typer.Option(False, "--resume"),
         as_json: bool = typer.Option(False, "--json"),
     ):
-        """Browser login by default; --device uses a code. --json starts/polls once."""
+        """Sign in or sign up on the website. --device uses GitHub; --json starts/polls once."""
         check_mode_override("hosted")
         origin = service_url(url)
         credential_store()  # Fail before creating a provider authorization.
@@ -188,15 +200,30 @@ def register(app: typer.Typer):
             except ValueError:
                 raise AccountError("LOGIN_INVALID", "Run vmnest login again.") from None
         else:
-            endpoint = "/v1/auth/github/start" if device else "/v1/auth/github/browser/start"
+            endpoint = "/v1/auth/github/start" if device else "/v1/auth/cli/start"
             pending = validate_pending(client.request("POST", endpoint))
+            if not device:
+                if pending.get("flow") != "website":
+                    raise AccountError("LOGIN_INVALID", "Expected website login flow.")
+                pending["website_url"] = normalize_url(
+                    website
+                    or os.environ.get("VMNEST_SITE_URL")
+                    or config.get("website_url")
+                    or "https://vmnest.cc"
+                )
+                if website:
+                    config["website_url"] = pending["website_url"]
             browser_url(pending, origin)
             secret(origin, "pending", json.dumps(pending))
         config.update(mode="hosted", url=origin)
         save_config(config)
         verification_uri = browser_url(pending, origin)
         endpoint = (
-            "/v1/auth/github/browser" if pending.get("flow") == "browser" else "/v1/auth/github"
+            "/v1/auth/cli"
+            if pending.get("flow") == "website"
+            else "/v1/auth/github/browser"
+            if pending.get("flow") == "browser"
+            else "/v1/auth/github"
         )
         public = {
             "ok": True,
@@ -219,7 +246,7 @@ def register(app: typer.Typer):
                 if "user_code" in public:
                     typer.echo("Enter code: " + public["user_code"])
                 typer.echo(
-                    "Waiting for GitHub approval..."
+                    "Waiting for approval in your browser..."
                     if interactive
                     else "After approval, run vmnest login --resume"
                 )

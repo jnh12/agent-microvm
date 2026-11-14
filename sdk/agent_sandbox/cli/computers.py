@@ -20,7 +20,7 @@ def present(result, as_json=False):
         "name": result["name"],
         "type": (result.get("agent") or {}).get("provider", "Computer"),
         "status": result.get("status", result.get("state", "Unknown")),
-        "idle_minutes": result.get("idle_minutes", 15),
+        "idle_minutes": result.get("idle_minutes", 5),
         "disposable": result.get("disposable", False),
     }
     if result.get("project"):
@@ -33,6 +33,65 @@ def present(result, as_json=False):
 
 
 def register(app):
+    @app.command("usage")
+    @handled
+    def usage(as_json: bool = typer.Option(False, "--json")):
+        """Show your plan, pooled machine-hours and saved-machine allowance."""
+        from .agent_profiles import api
+        result = api("GET", "/v1/billing")
+        details(result if as_json else {
+            "plan": result["plan"],
+            "hours_used": round(result["used_seconds"] / 3600, 2),
+            "hours_included": result["hours"],
+            "machines": f'{result["machine_count"]} / {result["machine_limit"]}',
+        }, as_json, title="Usage")
+
+    @app.command("rename")
+    @handled
+    def rename(name: str, label: str, as_json: bool = typer.Option(False, "--json")):
+        """Change a display name; the machine's CLI identifier stays the same."""
+        from .agent_profiles import api
+        label = label.strip()
+        if not label or len(label) > 63 or any(ord(c) < 32 or ord(c) == 127 for c in label):
+            raise typer.BadParameter("Use a display name of 1–63 characters without control characters.")
+        details(api("POST", vm_path(name) + "/rename", {"label": label}), as_json)
+
+    @app.command("configure")
+    @handled
+    def configure(
+        name: str,
+        idle_minutes: float | None = typer.Option(None, "--idle-minutes", min=0.001, max=15),
+        model: str | None = typer.Option(None, "--model", help="Machine default model; 'default' resets it."),
+        effort: str | None = typer.Option(None, "--effort", help="Machine default effort; 'default' resets it."),
+        integration: list[str] | None = typer.Option(None, "--integration", help="Replace machine integrations; repeat for multiple."),
+        no_integrations: bool = typer.Option(False, "--no-integrations", help="Clear machine integrations."),
+        as_json: bool = typer.Option(False, "--json"),
+    ):
+        """View or edit machine settings. Power off before changing agent defaults."""
+        from .agent_profiles import api, select
+        if integration and no_integrations:
+            raise typer.BadParameter("Choose --integration or --no-integrations.")
+        if idle_minutes is not None and not math.isfinite(idle_minutes):
+            raise typer.BadParameter("Idle minutes must be finite.")
+        route = vm_path(name) + "/configuration"
+        current = api("GET", route)
+        agent_change = model is not None or effort is not None or bool(integration) or no_integrations
+        if idle_minutes is None and not agent_change:
+            details(current, as_json)
+            return
+        if agent_change and (not (current.get("agent") or {}).get("provider") or current["state"] != "TERMINATED"):
+            raise typer.BadParameter("Power off an agent machine before changing agent defaults.")
+        body = {"label": current.get("label") or name,
+                "idle_minutes": idle_minutes if idle_minutes is not None else current["idle_minutes"]}
+        if model is not None:
+            body["model"] = model
+        if effort is not None:
+            body["effort"] = effort
+        if integration or no_integrations:
+            body["integrations"] = select(integration, no_integrations=no_integrations,
+                                          unattended=True, provider=current["agent"]["provider"])
+        details(api("POST", route, body), as_json)
+
     @app.command("open")
     @handled
     def open_computer(name: str, as_json: bool = typer.Option(False, "--json")):

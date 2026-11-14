@@ -154,6 +154,13 @@ class AccountClient:
                     code = "SERVICE_ERROR"
                 # Avoid printing arbitrary provider/proxy responses or secrets.
                 messages = {
+                    "HOURS_EXHAUSTED": "Monthly machine-hours are used up. Upgrade at vmnest.cc/dashboard/billing or wait for renewal.",
+                    "MACHINE_LIMIT": "Your plan's machine limit is reached. Delete a machine or upgrade.",
+                    "BILLING_UNAVAILABLE": "Billing is temporarily unavailable. Please retry.",
+                    "NO_SUBSCRIPTION": "Choose a plan on the VMNest billing page.",
+                    "SUBSCRIPTION_EXISTS": "You already have a subscription. Manage it on the VMNest billing page.",
+                    "BILLING_PENDING": "Payment is being confirmed. Run vmnest usage shortly.",
+                    "BILLING_REVIEW": "Your subscriptions need review. Contact VMNest support.",
                     "AGENT_BUSY": "The agent is still working, or its queue is paused.",
                     "VM_BUSY": "The computer is busy with another operation. Try again shortly.",
                     "VM_SAVING": "The computer is saving or waking. Try again shortly.",
@@ -176,6 +183,7 @@ class AccountClient:
                     "AUTH_REQUIRED": "Sign in with vmnest login.",
                     "AUTH_EXPIRED": "Session invalid or revoked. Run vmnest login.",
                     "LOGIN_EXPIRED": "Login expired. Run vmnest login again.",
+                    "LOGIN_LOCKED": "Too many incorrect terminal codes. Run vmnest login again.",
                     "LOGIN_DENIED": "GitHub login denied. Run vmnest login again.",
                     "LOGIN_INVALID": "Could not verify login. Run vmnest login again.",
                     "RATE_LIMITED": "Too many login attempts. Try again later.",

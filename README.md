@@ -944,11 +944,11 @@ update; adding the CLI alone does not enable them on an older hosted deployment.
 Hosted computers and agents keep their names, workspace files, and conversations.
 Create once, then use `vmnest open NAME`, `vmnest exec NAME -- COMMAND`, or
 `vmnest agent chat NAME` whenever you return. They wake automatically if needed.
-After 15 minutes idle, the service saves before shutting down compute. Active agent
+After 5 minutes idle by default, the service saves before shutting down compute. Active agent
 work, guest background jobs, and connection leases keep it awake.
 
-`vmnest create dev --idle-minutes 5` selects a shorter idle interval.
-The maximum and default are 15 minutes; disabling idle shutdown is not allowed. `--disposable` discards guest state on shutdown.
+`vmnest create dev --idle-minutes 10` selects a different idle interval.
+The default is 5 minutes and the maximum is 15 minutes; disabling idle shutdown is not allowed. `--disposable` discards guest state on shutdown.
 Files in `/workspace` and `/home/agent` persist; RAM, running processes, and system
 changes outside these folders do not. Use saved `--setup` for system dependencies.
 Checkpoint, restore, and workspace-management commands are no longer part of the CLI.
@@ -1037,6 +1037,21 @@ switching. Run responses expose the requested model (`null` means runtime defaul
 The API accepts `model` in POST agent runs and POST/PATCH agent profiles.
 
 ### Shutdown and deletion
+
+Change an existing hosted machine's display name or settings:
+
+```bash
+vmnest rename dev "My workspace"
+vmnest configure dev                         # Show current settings
+vmnest configure dev --idle-minutes 10
+vmnest configure dev --model default --effort high
+vmnest configure dev --integration GitHub    # Replace integrations; repeat the flag for more
+vmnest configure dev --no-integrations
+```
+
+Renaming keeps the CLI identifier (`dev`) unchanged. Power off before changing
+model, effort, or integrations; changes apply on the next start. Both commands
+support `--json`.
 
 `vmnest shutdown NAME` saves the workspace before stopping compute. Use `vmnest open NAME`
 or agent chat to return. Active agent runs or background work must finish or be cancelled first.

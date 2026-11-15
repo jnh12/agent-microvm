@@ -1,5 +1,6 @@
 """Provider-reported model choices, effort levels, and account defaults."""
 
+import sys
 from typing import Literal
 from urllib.parse import quote
 
@@ -10,6 +11,10 @@ from agent_sandbox.accounts import AccountError
 from .accounts import handled
 from .agent_profiles import api
 from .output import details, table
+
+
+def interactive_terminal():
+    return sys.stdin.isatty()
 
 
 def provider_name(provider):
@@ -40,10 +45,11 @@ def choose(
     if model is None and effort is None and not interactive:
         return model, effort
     catalog = api("GET", f"/v1/agent-connections/{provider}/models")
-    if not as_json:
+    selecting = interactive or model == "select" or effort == "select"
+    if not as_json and selecting:
         show(catalog)
     if interactive or model == "select":
-        if as_json:
+        if as_json or not interactive_terminal():
             raise AccountError(
                 "MODEL_REQUIRED", "Specify --model; use agent models --json to list choices."
             )
@@ -67,10 +73,10 @@ def choose(
             "Available models: " + ", ".join(m["id"] for m in catalog["items"]) + "; default",
         )
     levels = chosen["efforts"] if chosen else []
-    if not as_json:
+    if not as_json and selecting:
         typer.echo("Available effort levels: " + ", ".join(["default", *levels]))
     if interactive or effort == "select":
-        if as_json:
+        if as_json or not interactive_terminal():
             raise AccountError(
                 "EFFORT_REQUIRED", "Specify --effort; use agent models --json to list choices."
             )

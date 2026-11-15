@@ -66,7 +66,8 @@ def test_unattended_requires_selection_and_rejects_unavailable(api):
         select(["github"], no_integrations=True)
 
 
-def test_interactive_selection_and_default_configuration(api):
+def test_interactive_selection_and_default_configuration(api, monkeypatch):
+    monkeypatch.setattr("agent_sandbox.cli.agent_models.interactive_terminal", lambda: True)
     runner = CliRunner()
     response = runner.invoke(app, ["profile", "create", "dev"], input="1,2\n")
     assert response.exit_code == 0, response.output

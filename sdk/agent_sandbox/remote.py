@@ -1,5 +1,6 @@
 """Authenticated transport for hosted VMs; AWS operations belong to the service."""
 
+import math
 import os
 from urllib.parse import quote, urlsplit
 
@@ -35,13 +36,31 @@ def request(method, path, body=None):
     if not token:
         raise SandboxError("Sign in with vmnest login before using remote VMs")
     try:
-        with httpx.Client(timeout=httpx.Timeout(None, connect=10), trust_env=False) as client:
+        timeout = float(os.getenv("VMNEST_REQUEST_TIMEOUT_SECONDS", "240"))
+    except ValueError:
+        raise SandboxError("Request timeout must be a number") from None
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise SandboxError("Request timeout must be finite and positive")
+    try:
+        with httpx.Client(
+            timeout=httpx.Timeout(timeout, connect=min(10, timeout)), trust_env=False
+        ) as client:
             response = client.request(
                 method, url + path, json=body, headers={"Authorization": "Bearer " + token}
             )
         if response.is_error:
-            raise SandboxError(f"Remote operation failed ({response.status_code}): {response.text}")
+            try:
+                code = response.json()["error"]["code"]
+                if not isinstance(code, str) or not code.replace("_", "").isalnum():
+                    code = "REMOTE_ERROR"
+            except (ValueError, KeyError, TypeError):
+                code = "REMOTE_ERROR"
+            error = SandboxError(f"Remote operation failed ({response.status_code}): {code}")
+            error.code = code
+            raise error
         return response.json()
+    except ValueError:
+        raise SandboxError("Invalid backend response; operation may have completed.") from None
     except httpx.HTTPError:
         raise SandboxError(
             "Backend connection failed; operation may have completed. No retry made."

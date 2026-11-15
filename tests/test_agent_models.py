@@ -25,7 +25,8 @@ def catalog(monkeypatch):
     return calls
 
 
-def test_interactive_model_and_effort_picker(catalog):
+def test_interactive_model_and_effort_picker(catalog, monkeypatch):
+    monkeypatch.setattr("agent_sandbox.cli.agent_models.interactive_terminal", lambda: True)
     result = CliRunner().invoke(app, ["model", "--provider", "codex"], input="a\nhigh\n")
     assert result.exit_code == 0, result.output
     assert "Model A" in result.output and "low, high" in result.output

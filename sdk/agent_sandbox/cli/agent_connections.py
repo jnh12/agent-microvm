@@ -1,6 +1,7 @@
 """Connect existing local subscription logins to a VMNest account."""
 
 import json
+import sys
 from pathlib import Path
 from typing import Literal
 
@@ -122,7 +123,7 @@ def connect(
 
     url = service_url()
     if provider is None:
-        if yes or as_json or credentials_file:
+        if yes or as_json or credentials_file or not sys.stdin.isatty():
             raise AccountError(
                 "PROVIDER_REQUIRED", "Specify --provider codex or --provider claude."
             )
@@ -167,7 +168,7 @@ def connect(
         found = discover(provider, clean_credentials)
         if source is None and len(found) == 1:
             source = next(iter(found))
-        if source is None and found and not (yes or as_json):
+        if source is None and found and not (yes or as_json) and sys.stdin.isatty():
             source = typer.prompt("Choose login source (" + ", ".join(found) + ")")
         if source not in found:
             raise AccountError(
@@ -176,7 +177,7 @@ def connect(
             )
         payload = found[source]
     if not yes:
-        if as_json:
+        if as_json or not sys.stdin.isatty():
             raise AccountError("CONSENT_REQUIRED", "Use --yes to authorize credential upload.")
         typer.confirm(
             f"Upload your {provider} subscription credentials to {url} for future cloud VMs?",

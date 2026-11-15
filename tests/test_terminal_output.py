@@ -90,15 +90,13 @@ def test_chat_commands_and_detach_do_not_cancel(monkeypatch):
     monkeypatch.setattr(
         agent_runs, "submit", lambda *args: calls.append(args) or {"id": "r", "status": "queued"}
     )
-    result = runner.invoke(
-        app,
-        ["agent", "chat", "dev", "--history", "0"],
-        input="\n/help\n/unknown\n/queue hello\n/exit\n",
-    )
-    assert result.exit_code == 0, result.output
-    assert "Unknown command" in result.output and "Left chat" in result.output
+    # Exercise the human chat loop directly; the CLI separately guards non-TTY use.
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO("\n/help\n/unknown\n/queue hello\n/exit\n"))
+    chat.run_chat("dev", "main", 0)
     assert ("dev", "hello", "main", True) in calls
     assert not any("/cancel" in str(call) for call in calls)
+
 
 
 def test_prompt_preserves_draft_during_output_and_multiline():

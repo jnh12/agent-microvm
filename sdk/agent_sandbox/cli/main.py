@@ -28,6 +28,8 @@ from .mode_help import ModeApp, ModeGroup, selected_mode, unavailable
 from .output import details
 from .projects import app as project_app
 from .remote import register_files, routed
+from .runtime import get_current_context
+from .schema import register as register_schema
 from .state import SandboxRecord, StateStore
 
 app = ModeApp(
@@ -52,6 +54,8 @@ register_files(app)
 register_accounts(app)
 register_computers(app)
 
+register_schema(app)
+
 
 @app.callback()
 def mode_guard(ctx: typer.Context):
@@ -70,8 +74,12 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-def _fail(message: str) -> None:
-    err_console.print(f"[red]error:[/red] {message}")
+def _fail(message: str, code="OPERATION_FAILED", **fields) -> None:
+    ctx = get_current_context(silent=True)
+    if ctx and ctx.params.get("as_json"):
+        typer.echo(json.dumps({"ok": False, "error": {"code": code, "message": message}, **fields}))
+    else:
+        err_console.print(f"[red]error:[/red] {message}")
     raise typer.Exit(code=1)
 
 
@@ -147,7 +155,23 @@ def _resolve_egress_connectors(egress_connector: str | None, use_infra: bool) ->
     return None
 
 
-def _print_exec(result) -> None:
+def _print_exec(result, request_key=None) -> None:
+    import base64
+
+    ctx = get_current_context(silent=True)
+    if ctx and ctx.params.get("as_json"):
+        value = {
+            "exit_code": result.exit_code,
+            "encoding": "base64",
+            "stdout": base64.b64encode(result.stdout).decode(),
+            "stderr": base64.b64encode(result.stderr).decode(),
+        }
+        if request_key:
+            value["request_key"] = request_key
+        typer.echo(json.dumps(value))
+        if not result.success:
+            raise typer.Exit(code=result.exit_code)
+        return
     if result.stdout:
         console.out(result.stdout_text, end="")
     if result.stderr:
@@ -274,6 +298,7 @@ def run(
         "-e",
         help="Attach the egress connector from infra outputs.",
     ),
+    as_json: bool = typer.Option(False, "--json"),
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Boot an ephemeral sandbox, run a command, then terminate it."""
@@ -310,6 +335,7 @@ def exec(
     name: str = typer.Argument(..., help="Sandbox name."),
     cmd: list[str] = typer.Argument(None, help="Command after `--`."),
     region: str | None = typer.Option(None, "--region"),
+    as_json: bool = typer.Option(False, "--json"),
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
     """Execute a command in a running sandbox."""

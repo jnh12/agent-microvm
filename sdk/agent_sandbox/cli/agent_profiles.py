@@ -33,6 +33,9 @@ def select(
     unattended=False,
     provider="codex",
 ):
+    from .agent_models import interactive_terminal
+
+    unattended = unattended or not interactive_terminal()
     if sum((bool(integrations), all_integrations, no_integrations)) > 1:
         raise AccountError(
             "INVALID_REQUEST", "Choose --integration, --all-integrations, or --no-integrations."

@@ -5,6 +5,8 @@ import functools
 import uuid
 from pathlib import Path
 
+import typer
+
 from agent_sandbox.accounts import AccountError
 from agent_sandbox.errors import SandboxError
 from agent_sandbox.models import ExecResult
@@ -96,7 +98,8 @@ def routed(function):
                         result["exit_code"],
                         base64.b64decode(result["stdout"]),
                         base64.b64decode(result["stderr"]),
-                    )
+                    ),
+                    request_key=key,
                 )
             elif operation in {"start", "stop", "rm"}:
                 if operation == "rm":
@@ -142,6 +145,12 @@ def routed(function):
             else:
                 raise SandboxError("This operation is not available through the remote API")
         except (SandboxError, AccountError) as exc:
+            if kwargs.get("as_json"):
+                _fail(
+                    str(exc),
+                    code=getattr(exc, "code", "REMOTE_ERROR"),
+                    **({"request_key": key} if operation in {"create", "run", "exec"} else {}),
+                )
             if operation in {"create", "run", "exec"}:
                 _fail(
                     f"{exc}\nRequest key: {key}. "
@@ -154,14 +163,42 @@ def routed(function):
 
 def register_files(app):
     @app.command()
-    def upload(name: str, source: Path, destination: str):
+    def upload(
+        name: str, source: Path, destination: str, as_json: bool = typer.Option(False, "--json")
+    ):
         """Copy a local file into a VM (direct or remote)."""
         transfer(name, source, destination, True)
+        if as_json:
+            from .output import details
+
+            details(
+                {
+                    "name": name,
+                    "source": str(source),
+                    "destination": destination,
+                    "status": "uploaded",
+                },
+                True,
+            )
 
     @app.command()
-    def download(name: str, source: str, destination: Path):
+    def download(
+        name: str, source: str, destination: Path, as_json: bool = typer.Option(False, "--json")
+    ):
         """Copy a VM file to a local path (direct or remote)."""
         transfer(name, destination, source, False)
+        if as_json:
+            from .output import details
+
+            details(
+                {
+                    "name": name,
+                    "source": source,
+                    "destination": str(destination),
+                    "status": "downloaded",
+                },
+                True,
+            )
 
 
 def transfer(name, local, guest, upload):

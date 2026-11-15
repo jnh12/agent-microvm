@@ -1134,3 +1134,9 @@ batch safely. Each result also includes its own derived request key: use that ke
 when retrying just one computer. Failed requests do not roll back successful ones.
 Single-computer creation keeps its existing response format. Self-hosted creation
 continues to accept one name at a time.
+
+### Automating the CLI
+
+Use `vmnest schema` to discover commands and options as JSON. Task submission,
+waiting, event streams, stdin prompts, binary-safe command results, and exit codes
+are documented in [CLI automation](docs/automation.md).

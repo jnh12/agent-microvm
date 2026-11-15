@@ -47,7 +47,15 @@ def emit(value, as_json):
 
 def fail(exc: AccountError, as_json=False):
     if as_json:
-        emit({"ok": False, "error": {"code": exc.code, "message": str(exc)}}, True)
+        emit(
+            {
+                "ok": False,
+                "error": {"code": exc.code, "message": str(exc)},
+                **({"request_key": exc.request_key} if hasattr(exc, "request_key") else {}),
+                **({"run_id": exc.run_id} if hasattr(exc, "run_id") else {}),
+            },
+            True,
+        )
     else:
         typer.echo(f"Error [{exc.code}]: {exc}", err=True)
     raise typer.Exit(1)

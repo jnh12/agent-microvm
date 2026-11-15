@@ -154,11 +154,18 @@ class AccountClient:
                     code = "SERVICE_ERROR"
                 # Avoid printing arbitrary provider/proxy responses or secrets.
                 messages = {
-                    "HOURS_EXHAUSTED": "Monthly machine-hours are used up. Upgrade at vmnest.cc/dashboard/billing or wait for renewal.",
-                    "MACHINE_LIMIT": "Your plan's machine limit is reached. Delete a machine or upgrade.",
+                    "HOURS_EXHAUSTED": (
+                        "Monthly machine-hours are used up. Upgrade at "
+                        "vmnest.cc/dashboard/billing or wait for renewal."
+                    ),
+                    "MACHINE_LIMIT": (
+                        "Your plan's machine limit is reached. Delete a machine or upgrade."
+                    ),
                     "BILLING_UNAVAILABLE": "Billing is temporarily unavailable. Please retry.",
                     "NO_SUBSCRIPTION": "Choose a plan on the VMNest billing page.",
-                    "SUBSCRIPTION_EXISTS": "You already have a subscription. Manage it on the VMNest billing page.",
+                    "SUBSCRIPTION_EXISTS": (
+                        "You already have a subscription. Manage it on the VMNest billing page."
+                    ),
                     "BILLING_PENDING": "Payment is being confirmed. Run vmnest usage shortly.",
                     "BILLING_REVIEW": "Your subscriptions need review. Contact VMNest support.",
                     "AGENT_BUSY": "The agent is still working, or its queue is paused.",
@@ -167,18 +174,26 @@ class AccountClient:
                     "VM_NOT_RUNNING": "The computer is not running. Open it and try again.",
                     "AGENT_NOT_READY": "The agent is not ready yet. Try again shortly.",
                     "PROJECT_NOT_READY": "Project setup is not ready yet.",
-                    "COMPUTER_STARTING": "The computer is still waking. Retry with the same request key.",
+                    "COMPUTER_STARTING": (
+                        "The computer is still waking. Retry with the same request key."
+                    ),
                     "REQUEST_CONFLICT": "This request key was already used for different input.",
-
-                    "DISCOVERY_UNAVAILABLE": "Integration discovery is unavailable; retry later or contact the operator.",
+                    "DISCOVERY_UNAVAILABLE": (
+                        "Integration discovery is unavailable; retry later or contact the "
+                        "operator."
+                    ),
                     "CONNECTION_CHANGED": "The agent connection changed. Try again.",
                     "AGENT_NOT_CONNECTED": "Connect your Codex account first.",
                     "AGENT_RECONNECT_REQUIRED": "Reconnect the agent account with --replace.",
                     "AGENT_REFRESH_PENDING": "Agent refresh is pending. Try again later.",
-                    "INTEGRATION_UNAVAILABLE": "A selected integration is unavailable. Check vmnest agent integrations.",
+                    "INTEGRATION_UNAVAILABLE": (
+                        "A selected integration is unavailable. Check vmnest agent integrations."
+                    ),
                     "PROFILE_NOT_FOUND": "Agent profile not found.",
                     "PROFILE_EXISTS": "Agent profile exists. Use profile update.",
-                    "CONNECTION_EXISTS": "A connection is already saved. Use --replace to explicitly replace it.",
+                    "CONNECTION_EXISTS": (
+                        "A connection is already saved. Use --replace to explicitly replace it."
+                    ),
                     "INVALID_REQUEST": "Unsupported or invalid request data.",
                     "AUTH_REQUIRED": "Sign in with vmnest login.",
                     "AUTH_EXPIRED": "Session invalid or revoked. Run vmnest login.",

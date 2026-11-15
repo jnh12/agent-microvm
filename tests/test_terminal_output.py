@@ -187,30 +187,45 @@ def test_wait_failed_startup_is_an_error(monkeypatch):
     result = runner.invoke(app, ["wait", "dev"])
     assert result.exit_code != 0 and "Setup failed" in result.output
 
+
 def test_shutdown_and_delete_transport(monkeypatch):
     from agent_sandbox.cli.main import app
     from typer.testing import CliRunner
-    monkeypatch.setenv('VMNEST_MODE','hosted')
-    monkeypatch.setenv('VMNEST_API_URL','https://example.test')
-    calls=[]
-    def request(method,path):
-        calls.append((method,path))
-        return {'name':'dev','status':'deleted' if method=='DELETE' else 'sleeping'}
-    monkeypatch.setattr('agent_sandbox.cli.computers.request',request)
-    runner=CliRunner()
-    assert runner.invoke(app,['shutdown','dev']).exit_code==0
-    assert calls[-1]==('POST','/v1/vms/dev/shutdown')
-    assert runner.invoke(app,['delete','dev']).exit_code==0
-    assert calls[-1]==('DELETE','/v1/vms/dev?permanent=true')
+
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "https://example.test")
+    calls = []
+
+    def request(method, path):
+        calls.append((method, path))
+        return {"name": "dev", "status": "deleted" if method == "DELETE" else "sleeping"}
+
+    monkeypatch.setattr("agent_sandbox.cli.computers.request", request)
+    runner = CliRunner()
+    assert runner.invoke(app, ["shutdown", "dev"]).exit_code == 0
+    assert calls[-1] == ("POST", "/v1/vms/dev/shutdown")
+    assert runner.invoke(app, ["delete", "dev"]).exit_code == 0
+    assert calls[-1] == ("DELETE", "/v1/vms/dev?permanent=true")
 
 
 def test_chat_buffers_fragments_until_complete_message():
     output = io.StringIO()
     render = chat.EventRenderer(Console(file=output, width=100, color_system=None))
     for fragment in ("Created ", "the PR ", "successfully."):
-        render.render({"data": {"method": "item/agentMessage/delta", "params": {"delta": fragment}}})
+        render.render(
+            {"data": {"method": "item/agentMessage/delta", "params": {"delta": fragment}}}
+        )
     assert output.getvalue() == ""
-    render.render({"data": {"method": "item/completed", "params": {"item": {"type": "agentMessage", "text": "Created the PR successfully."}}}})
+    render.render(
+        {
+            "data": {
+                "method": "item/completed",
+                "params": {
+                    "item": {"type": "agentMessage", "text": "Created the PR successfully."}
+                },
+            }
+        }
+    )
     assert output.getvalue().count("Created the PR successfully.") == 1
 
 
@@ -218,15 +233,27 @@ def test_busy_error_is_preserved_and_not_reported_as_uncertain(monkeypatch):
     import httpx
     import pytest
     from agent_sandbox.accounts import AccountClient, AccountError
+
     class Client:
-        def __init__(self, **kwargs): pass
-        def __enter__(self): return self
-        def __exit__(self, *args): pass
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
         def request(self, *args, **kwargs):
-            return httpx.Response(409, json={"error": {"code": "AGENT_BUSY", "message": "sensitive upstream detail"}})
+            return httpx.Response(
+                409, json={"error": {"code": "AGENT_BUSY", "message": "sensitive upstream detail"}}
+            )
+
     monkeypatch.setattr(httpx, "Client", Client)
+
     def api(*args):
         return AccountClient("https://example.test").request("POST", "/v1/vms/dev/agent/runs")
+
     monkeypatch.setattr(agent_runs, "api", api)
     with pytest.raises(AccountError) as caught:
         agent_runs.submit("dev", "hi")

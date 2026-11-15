@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import json
 
-from typer.testing import CliRunner
-
 from agent_sandbox.cli.main import app
 from agent_sandbox.infra.state import InfraStateStore
+from typer.testing import CliRunner
 
 runner = CliRunner()
 

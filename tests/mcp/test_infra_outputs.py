@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from agent_sandbox_mcp.tools.infra import build_outputs
 
 

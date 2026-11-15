@@ -17,12 +17,12 @@ import os
 import sys
 import threading
 
-_PYTHON = sys.executable or "python3"
-
 from fastapi import FastAPI, Request, Response
 
 from agentd import identity, state
 from agentd.exec import run_command
+
+_PYTHON = sys.executable or "python3"
 
 log = logging.getLogger("agentd.hooks")
 

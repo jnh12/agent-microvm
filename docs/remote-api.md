@@ -5,16 +5,16 @@ provisioning, and thin remote CLI transport. The separate `vmnest-service` repos
 owns the HTTP backend, SQLite inventory, recovery, API dependencies, and service
 infrastructure. Install/run the backend from that repository, not from this package.
 
-Remote mode requires GitHub login. Browser approval is the default; `--device` is a
-code-based fallback. Sessions stay valid until logout/revocation and are stored in the
-OS credential store. The backend is still loopback-only during development; use an
-authenticated tunnel for another machine.
+Hosted mode signs in through the VMNest website by default; `login --device` uses
+the GitHub device-code fallback. Sessions are stored in the OS credential store.
+Use the hosted API URL below, or a loopback service URL for local development.
 
 ```sh
-vmnest setup --mode hosted --url http://127.0.0.1:8767
+vmnest setup --mode hosted --url https://api.vmnest.cc
 vmnest login
 vmnest whoami
-vmnest create demo --request-key example-create
+vmnest create demo --agent none --request-key example-create
+vmnest wait demo
 vmnest exec demo --request-key example-exec -- python3 -c "print('hello')"
 vmnest upload demo input.txt /tmp/input.txt
 vmnest download demo /tmp/input.txt result.txt
@@ -25,9 +25,15 @@ vmnest start demo
 vmnest logs demo
 vmnest metrics demo
 vmnest forward demo --remote-port 8081 --local-port 8081
-vmnest rm demo
+vmnest shutdown demo
+vmnest open demo
+vmnest usage
 vmnest run default -- python3 -c "print('ephemeral')"
 ```
+
+Creation runs in the background; `wait` waits for readiness. `shutdown` saves a
+persistent computer and stops compute; `open` wakes it again. `delete` permanently
+removes the computer, its saved workspace, and conversation history.
 
 Image, role, region, networking and log-group selection are backend-managed in remote
 mode. `infra`, `image`, and MCP commands remain direct-only. Provision infrastructure
@@ -40,7 +46,8 @@ are not automatically replayed. See the service repository for recovery behavior
 HTTP routes, database handling, and operator configuration.
 
 Each account sees only its own VMs. Names and request keys are independent between
-accounts. No per-account VM quota or billing has been added.
+accounts. `vmnest usage` shows the plan, pooled machine-hours, and saved-machine
+allowance returned by the service. Billing and limit enforcement belong to the backend.
 
 Account commands support `--json`. Agents start `login --json`, open the returned
 approval link for the user, then poll `login --resume --json` at the returned interval.

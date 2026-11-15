@@ -39,7 +39,6 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
-
 from agent_sandbox import Sandbox
 
 # Surface control-plane retry warnings (e.g. transient RunMicrovm failures).
@@ -51,7 +50,7 @@ WORKDIR = "/work"
 
 # A minimal FastAPI todo app. In a real flow this is what a coding agent
 # (Claude Code / Cursor) would have generated into the VM's filesystem.
-FASTAPI_APP = '''\
+FASTAPI_APP = """\
 from fastapi import FastAPI
 from pydantic import BaseModel
 
@@ -79,7 +78,7 @@ def add_todo(todo: Todo) -> dict:
     item = {"id": len(_todos) + 1, **todo.model_dump()}
     _todos.append(item)
     return item
-'''
+"""
 
 # Start uvicorn detached so the (blocking) exec call returns while the server
 # keeps running. ``Sandbox.exec`` waits on the process's stdout/stderr pipes
@@ -198,7 +197,9 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", default="fastapi-demo", help="sandbox name")
     parser.add_argument("--image", default=None, help="image ARN (or $AGENT_SANDBOX_IMAGE_ARN)")
-    parser.add_argument("--role", default=None, help="execution role ARN (or $AGENT_SANDBOX_EXECUTION_ROLE_ARN)")
+    parser.add_argument(
+        "--role", default=None, help="execution role ARN (or $AGENT_SANDBOX_EXECUTION_ROLE_ARN)"
+    )
     parser.add_argument("--region", default=None, help="AWS region")
     parser.add_argument("--local-port", type=int, default=LOCAL_PORT, help="local proxy port")
     parser.add_argument(

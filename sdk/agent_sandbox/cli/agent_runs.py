@@ -55,7 +55,14 @@ def submit(name, text, session="main", queue=False, request_key=None, model=None
             },
         )
     except AccountError as exc:
-        if exc.code in {"AGENT_BUSY", "VM_BUSY", "VM_SAVING", "AGENT_NOT_READY", "PROJECT_NOT_READY", "VM_NOT_RUNNING"}:
+        if exc.code in {
+            "AGENT_BUSY",
+            "VM_BUSY",
+            "VM_SAVING",
+            "AGENT_NOT_READY",
+            "PROJECT_NOT_READY",
+            "VM_NOT_RUNNING",
+        }:
             raise
         raise AccountError(
             exc.code, str(exc) + " Request key: " + key + ". Reuse it when retrying."
@@ -79,15 +86,6 @@ def resolve(name, run_id=None, session=None):
     return active[0] if active else items[0]
 
 
-def render(event, as_json):
-    if as_json:
-        typer.echo(json.dumps(event))
-        return
-    from .chat import EventRenderer
-
-    EventRenderer().render(event)
-
-
 def follow(identifier, as_json=False, after=0, wait=True):
     path = "/v1/agent-runs/" + quote(identifier, safe="")
     from .chat import EventRenderer
@@ -97,7 +95,7 @@ def follow(identifier, as_json=False, after=0, wait=True):
         page = api("GET", path + "/events?after=" + str(after))
         for event in page["items"]:
             if as_json:
-                render(event, True)
+                typer.echo(json.dumps(event))
             else:
                 renderer.render(event)
         after = page["cursor"]
@@ -244,9 +242,8 @@ def register(app):
             5, "--history", min=0, help="Recent completed runs to display."
         ),
     ):
-        from .chat import run_chat
-
         from .agent_models import for_computer
+        from .chat import run_chat
 
         model, effort = for_computer(name, model, effort, session)
         run_chat(name, session, history, model=model, effort=effort)

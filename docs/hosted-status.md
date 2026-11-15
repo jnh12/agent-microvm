@@ -1,6 +1,10 @@
-# Hosted integration status
+# Hosted integration validation: 2026-11-11
 
-This branch adds GitHub login and HTTP routing to the existing self-hosted CLI.
+This is a historical validation snapshot, not the current feature list. Later
+commits added website sign-in, agent chat, persistent computers, and usage commands.
+See [remote CLI setup](remote-api.md) and the README for the current interface.
+
+The initial integration added GitHub login and HTTP routing to the self-hosted CLI.
 The separate `vmnest-service` repository owns accounts, VM ownership, recovery,
 and hosted infrastructure. Hosted MCP support is deferred.
 
@@ -35,4 +39,4 @@ confirmed terminated. The SDK suite passed 123 tests.
 - The temporary Windows project launcher prints a uv warning on each invocation.
 
 These issues are documented, not fixed by the publication commit. Billing and
-account quotas are outside this integration's scope.
+account quotas were outside the initial integration's scope.

@@ -53,7 +53,10 @@ class StateStore:
 
     def _flush(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {**self._metadata, "sandboxes": {name: asdict(rec) for name, rec in self._records.items()}}
+        payload = {
+            **self._metadata,
+            "sandboxes": {name: asdict(rec) for name, rec in self._records.items()},
+        }
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, indent=2))
         tmp.replace(self._path)

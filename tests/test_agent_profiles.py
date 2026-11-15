@@ -134,16 +134,26 @@ def test_all_is_persistent_mode_without_inventory_snapshot(api, provider):
         )
     ]
 
+
 def test_profile_model_only_update_preserves_connections(monkeypatch):
     from agent_sandbox.cli.agent_profiles import app
     from typer.testing import CliRunner
+
     calls = []
+
     def api(method, path, body=None):
         calls.append((method, body))
-        return {'name':'dev','provider':'codex','model':'model-a','integrations':['github']}
-    monkeypatch.setattr('agent_sandbox.cli.agent_profiles.api', api)
-    monkeypatch.setattr('agent_sandbox.cli.agent_models.api', lambda *a: {'items':[{'id':'model-a','name':'Model A','efforts':['low'],'default':True}], 'defaults':{}})
-    result = CliRunner().invoke(app, ['update','dev','--model','model-a'])
+        return {"name": "dev", "provider": "codex", "model": "model-a", "integrations": ["github"]}
+
+    monkeypatch.setattr("agent_sandbox.cli.agent_profiles.api", api)
+    monkeypatch.setattr(
+        "agent_sandbox.cli.agent_models.api",
+        lambda *a: {
+            "items": [{"id": "model-a", "name": "Model A", "efforts": ["low"], "default": True}],
+            "defaults": {},
+        },
+    )
+    result = CliRunner().invoke(app, ["update", "dev", "--model", "model-a"])
     assert result.exit_code == 0, result.output
-    assert calls[-1] == ('PATCH', {'model':'model-a'})
-    assert 'model-a' in result.output
+    assert calls[-1] == ("PATCH", {"model": "model-a"})
+    assert "model-a" in result.output

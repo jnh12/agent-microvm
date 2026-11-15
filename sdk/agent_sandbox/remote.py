@@ -1,4 +1,4 @@
-"""Transport for a single-user VM backend. No account or AWS credentials required."""
+"""Authenticated transport for hosted VMs; AWS operations belong to the service."""
 
 import os
 from urllib.parse import quote, urlsplit

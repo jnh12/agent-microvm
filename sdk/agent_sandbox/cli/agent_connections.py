@@ -1,7 +1,6 @@
 """Connect existing local subscription logins to a VMNest account."""
 
 import json
-import os
 from pathlib import Path
 from typing import Literal
 
@@ -12,13 +11,13 @@ from agent_sandbox.cli.accounts import handled
 from agent_sandbox.cli.agent_profiles import api, select
 from agent_sandbox.cli.agent_profiles import app as profiles_app
 
+from .agent_models import register as register_models
 from .agent_runs import register as register_runs
 
 app = typer.Typer(name="agent", help="Manage saved agent account connections.")
 app.add_typer(profiles_app, name="profile")
 
 register_runs(app)
-from .agent_models import register as register_models
 register_models(app)
 Provider = Literal["codex", "claude"]
 
@@ -55,15 +54,6 @@ def default_agent(
         json.dumps(result)
         if as_json
         else (f"Default agent: {saved or 'auto'} (creates: {effective or 'plain computer'}).")
-    )
-
-
-def credential_path(provider):
-    if provider == "codex":
-        return Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "auth.json"
-    return (
-        Path(os.environ.get("CLAUDE_CONFIG_DIR", str(Path.home() / ".claude")))
-        / ".credentials.json"
     )
 
 
@@ -197,19 +187,17 @@ def connect(
         f"/v1/agent-connections/{provider}",
         body={"credentials": payload, "replace": replace},
     )
-    if provider in ("codex", "claude"):
-        try:
-            chosen = select(
-                integration, all_integrations, no_integrations, yes or as_json, provider
-            )
-            configured = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
-            result["integrations"] = configured["integrations"]
-        except AccountError as exc:
-            raise AccountError(
-                exc.code,
-                "Credentials were saved, but integration defaults were not updated. Use vmnest agent configure. "
-                + str(exc),
-            ) from None
+    try:
+        chosen = select(integration, all_integrations, no_integrations, yes or as_json, provider)
+        configured = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
+        result["integrations"] = configured["integrations"]
+    except AccountError as exc:
+        raise AccountError(
+            exc.code,
+            "Credentials were saved, but integration defaults were not updated. "
+            "Use vmnest agent configure. "
+            + str(exc),
+        ) from None
     typer.echo(
         json.dumps(result)
         if as_json

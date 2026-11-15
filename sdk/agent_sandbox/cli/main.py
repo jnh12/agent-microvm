@@ -22,8 +22,8 @@ from agent_sandbox.ports import HOOK_PORT
 from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
-from .computers import register as register_computers
 from .agent_connections import app as agent_app
+from .computers import register as register_computers
 from .mode_help import ModeApp, ModeGroup, selected_mode, unavailable
 from .output import details
 from .projects import app as project_app
@@ -59,11 +59,7 @@ def mode_guard(ctx: typer.Context):
     if unavailable(ctx.invoked_subcommand, selected):
         required = "self-hosted" if selected == "hosted" else "hosted"
         label = "direct-only" if required == "self-hosted" else "hosted-only"
-        raise typer.BadParameter(
-            f"This command is {label}. Use "
-            f"vmnest setup --mode {required}"
-        )
-
+        raise typer.BadParameter(f"This command is {label}. Use vmnest setup --mode {required}")
 
 
 console = Console()
@@ -124,17 +120,13 @@ def _resolve_image(image: str | None) -> str:
 
 
 def _resolve_role(role: str | None) -> str:
-    resolved = (
-        role or os.environ.get(ENV_ROLE_ARN) or _infra_outputs().get("execution_role_arn")
-    )
+    resolved = role or os.environ.get(ENV_ROLE_ARN) or _infra_outputs().get("execution_role_arn")
     if not resolved:
         _fail(f"--role is required (or set ${ENV_ROLE_ARN}, or run `vmnest infra up`).")
     return resolved  # type: ignore[return-value]
 
 
-def _resolve_egress_connectors(
-    egress_connector: str | None, use_infra: bool
-) -> list[str] | None:
+def _resolve_egress_connectors(egress_connector: str | None, use_infra: bool) -> list[str] | None:
     """Resolve the egress network connector(s) to attach at run time.
 
     Precedence: an explicit ``--egress-connector`` ARN wins; otherwise ``--egress``
@@ -155,8 +147,6 @@ def _resolve_egress_connectors(
     return None
 
 
-
-
 def _print_exec(result) -> None:
     if result.stdout:
         console.out(result.stdout_text, end="")
@@ -172,7 +162,13 @@ def _print_exec(result) -> None:
 @app.command()
 @routed
 def create(
-    idle_minutes: float | None = typer.Option(None, "--idle-minutes", min=0.001, max=15, help="Hosted idle shutdown in minutes; default 5, maximum 15."),
+    idle_minutes: float | None = typer.Option(
+        None,
+        "--idle-minutes",
+        min=0.001,
+        max=15,
+        help="Hosted idle shutdown in minutes; default 5, maximum 15.",
+    ),
     repository: str | None = typer.Option(
         None, "--repo", help="HTTPS Git repository to clone into /workspace/project."
     ),
@@ -196,7 +192,8 @@ def create(
         None, "--profile", help="Saved hosted Codex integration profile."
     ),
     agent: str | None = typer.Option(
-        None, "--agent",
+        None,
+        "--agent",
         help="Hosted agent: codex, claude, or none. Uses your default or sole connection.",
     ),
     image: str | None = typer.Option(None, "--image", "-i", help="MicroVM image ARN."),
@@ -271,7 +268,9 @@ def run(
         None, "--egress-connector", help="Egress network connector ARN to attach."
     ),
     egress: bool = typer.Option(
-        False, "--egress", "-e",
+        False,
+        "--egress",
+        "-e",
         help="Attach the egress connector from infra outputs.",
     ),
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
@@ -422,7 +421,9 @@ def ls(
         for rec in records:
             status = await _status(rec)
             table.add_row(rec.name, rec.microvm_id, status, rec.endpoint or "-")
-            items.append({"name": rec.name, "id": rec.microvm_id, "state": status, "endpoint": rec.endpoint})
+            items.append(
+                {"name": rec.name, "id": rec.microvm_id, "state": status, "endpoint": rec.endpoint}
+            )
         if as_json:
             console.print_json(data={"items": items})
         else:
@@ -553,9 +554,7 @@ def image_ls(
     async def _do() -> None:
         cp = ControlPlane(region=region)
         images = (
-            await cp.list_managed_microvm_images()
-            if managed
-            else await cp.list_microvm_images()
+            await cp.list_managed_microvm_images() if managed else await cp.list_microvm_images()
         )
         if not images:
             console.print("no images")
@@ -796,6 +795,7 @@ def _websocket_handshake_and_relay(
 
 def _require_record(name: str) -> SandboxRecord:
     from agent_sandbox.remote import remote_url, request, vm_path
+
     if remote_url():
         row = request("GET", vm_path(name))
         return SandboxRecord(name, row["id"], row.get("endpoint"), region=row.get("region"))
@@ -815,6 +815,7 @@ def _guard(coro) -> None:
 
 def _print_cw_logs(rec: SandboxRecord, region: str | None, log_group: str | None) -> None:
     from agent_sandbox.observability import read_logs
+
     try:
         for event in read_logs(rec.microvm_id, region, log_group):
             console.out(event.get("message", ""), end="")
@@ -824,6 +825,7 @@ def _print_cw_logs(rec: SandboxRecord, region: str | None, log_group: str | None
 
 def _print_cw_metrics(rec: SandboxRecord, region: str | None) -> None:
     from agent_sandbox.observability import read_metrics
+
     table = Table("METRIC", "LATEST")
     try:
         for metric, value in read_metrics(rec.microvm_id, region).items():
@@ -898,9 +900,7 @@ def _provisioner(setup_file: str | None, stack: str | None):
 
 @infra_app.command("init")
 def infra_init(
-    path: str = typer.Option(
-        "sandbox.yaml", "--file", "-f", help="Where to write the config."
-    ),
+    path: str = typer.Option("sandbox.yaml", "--file", "-f", help="Where to write the config."),
     force: bool = typer.Option(False, "--force", help="Overwrite if it exists."),
 ) -> None:
     """Scaffold a commented sandbox.yaml."""
@@ -927,7 +927,9 @@ def infra_preview(
 @infra_app.command("up")
 def infra_up(
     files: list[str] = typer.Option(
-        [], "--file", "-f",
+        [],
+        "--file",
+        "-f",
         help="Config file(s) or directories; repeatable (kubectl-style).",
     ),
     stack: str | None = typer.Option(None, "--stack", "-s"),
@@ -935,7 +937,9 @@ def infra_up(
         False, "--rebuild", help="Force a new MicroVM image version even if one is active."
     ),
     parallelism: int = typer.Option(
-        0, "--parallelism", "-p",
+        0,
+        "--parallelism",
+        "-p",
         help="Max projects to provision concurrently (0 = one per project).",
     ),
 ) -> None:
@@ -995,9 +999,7 @@ def _run_parallel_up(configs: list, *, rebuild: bool, parallelism: int) -> None:
     workers = parallelism if parallelism and parallelism > 0 else len(configs)
     results: list[tuple[str, dict | None, Exception | None]] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {
-            pool.submit(_run_one, cfg): f"{cfg.project}/{cfg.stack}" for cfg in configs
-        }
+        futures = {pool.submit(_run_one, cfg): f"{cfg.project}/{cfg.stack}" for cfg in configs}
         for future in concurrent.futures.as_completed(futures):
             label = futures[future]
             try:
@@ -1037,6 +1039,7 @@ def infra_destroy(
     stack: str | None = typer.Option(None, "--stack", "-s"),
 ) -> None:
     """Destroy all managed infrastructure."""
+
     def _report(msg: str) -> None:
         console.print(f"[cyan]→[/cyan] {msg}")
 
@@ -1086,8 +1089,13 @@ def forward(
         )
     local = local_port or remote_port
     verify = not no_verify_tls
-    hop_by_hop = {"content-encoding", "content-length", "transfer-encoding",
-                  "connection", "keep-alive"}
+    hop_by_hop = {
+        "content-encoding",
+        "content-length",
+        "transfer-encoding",
+        "connection",
+        "keep-alive",
+    }
     token = {"value": ""}
 
     async def _mint(cp: ControlPlane) -> str:
@@ -1097,6 +1105,7 @@ def forward(
 
     async def _setup() -> tuple[str, ControlPlane]:
         from agent_sandbox.remote import ForwardConnection, remote_url
+
         if remote_url():
             if region or no_verify_tls:
                 _fail("Remote forwarding uses backend region and verified TLS")
@@ -1110,8 +1119,11 @@ def forward(
                 endpoint = "https://" + endpoint
             return endpoint.rstrip("/"), cp
         sandbox = await Sandbox.attach(
-            name, rec.microvm_id, endpoint=rec.endpoint,
-            region=region or rec.region, verify_tls=verify,
+            name,
+            rec.microvm_id,
+            endpoint=rec.endpoint,
+            region=region or rec.region,
+            verify_tls=verify,
         )
         if not sandbox.endpoint:
             _fail(f"sandbox {name!r} has no endpoint (is it running?).")
@@ -1134,8 +1146,11 @@ def forward(
         def _proxy(self) -> None:
             length = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(length) if length else None
-            fwd = {k: v for k, v in self.headers.items()
-                   if k.lower() not in {"host", "content-length", "connection"}}
+            fwd = {
+                k: v
+                for k, v in self.headers.items()
+                if k.lower() not in {"host", "content-length", "connection"}
+            }
             fwd["X-aws-proxy-auth"] = token["value"]
             fwd["X-aws-proxy-port"] = str(remote_port)
             try:
@@ -1212,9 +1227,7 @@ def forward(
                 # `vmnest rm`), so give up after a few consecutive errors.
                 status_failures += 1
                 if status_failures >= _FORWARD_MAX_STATUS_FAILURES:
-                    console.print(
-                        f"[yellow]{name} is unreachable; disconnecting[/yellow]"
-                    )
+                    console.print(f"[yellow]{name} is unreachable; disconnecting[/yellow]")
                     break
             # Refresh the auth token roughly every 25 minutes.
             if time.monotonic() - last_refresh >= _FORWARD_TOKEN_REFRESH:

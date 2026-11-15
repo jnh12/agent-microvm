@@ -2,11 +2,14 @@
 
 from typing import Literal
 from urllib.parse import quote
+
 import typer
+
 from agent_sandbox.accounts import AccountError
+
 from .accounts import handled
 from .agent_profiles import api
-from .output import table, details
+from .output import details, table
 
 
 def provider_name(provider):

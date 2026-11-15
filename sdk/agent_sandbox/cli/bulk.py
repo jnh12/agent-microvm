@@ -1,6 +1,8 @@
 """Bounded computer batches with independent outcomes and stable output order."""
 
+import hashlib
 import json
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 import typer
@@ -8,6 +10,47 @@ import typer
 from agent_sandbox.accounts import AccountError
 from agent_sandbox.errors import SandboxError
 from agent_sandbox.remote import vm_path
+
+
+def create_many(names, body, parallel, as_json, request):
+    """Derive retry identities from batch key and name, independently of ordering."""
+    if any(not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,62}", name) for name in names):
+        raise typer.BadParameter("Names must start with a letter and use letters, digits, _ or -.")
+    batch_key = body["request_key"]
+
+    def perform(name):
+        key = "batch-" + hashlib.sha256(json.dumps([batch_key, name]).encode()).hexdigest()
+        item = {"name": name, "request_key": key}
+        try:
+            result = request("POST", "/v1/vms", {**body, "name": name, "request_key": key})
+            return {**item, "ok": True, "result": {**result, "request_key": key}}
+        except (SandboxError, AccountError) as exc:
+            return {**item, "ok": False, "error": str(exc)}
+
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        items = list(pool.map(perform, names))
+    failed = sum(not item["ok"] for item in items)
+    summary = {
+        "action": "create",
+        "request_key": batch_key,
+        "ok": not failed,
+        "succeeded": len(items) - failed,
+        "failed": failed,
+        "items": items,
+    }
+    if as_json:
+        typer.echo(json.dumps(summary))
+    else:
+        typer.echo(f"Batch request key: {batch_key}")
+        for item in items:
+            if item["ok"]:
+                typer.echo(f"{item['name']}: creation accepted; vmnest wait {item['name']}")
+            else:
+                typer.echo(f"{item['name']}: {item['error']}")
+                typer.echo(f"  Retry this computer with --request-key {item['request_key']}")
+        typer.echo(f"{len(items) - failed} accepted; {failed} failed.")
+    if failed:
+        raise typer.Exit(1)
 
 
 def lifecycle(action, names, all_computers, parallel, dry_run, as_json, request, present):

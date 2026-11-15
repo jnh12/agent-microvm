@@ -103,3 +103,70 @@ def test_parallel_limit(monkeypatch, calls):
     r = CliRunner().invoke(app, ["shutdown", "a", "b", "c", "d", "--parallel", "2"])
     assert r.exit_code == 0, r.output
     assert peak == 2
+
+
+def test_bulk_create_shared_options_and_retry_keys(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+    calls = []
+
+    def request(method, path, body=None):
+        assert (method, path) == ("POST", "/v1/vms")
+        calls.append(body)
+        if body["name"] == "bad":
+            raise SandboxError("Quota reached")
+        return {"name": body["name"], "status": "preparing"}
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    options = [
+        "--agent",
+        "codex",
+        "--prompt",
+        "hello",
+        "--disposable",
+        "--request-key",
+        "batch-one",
+        "--json",
+    ]
+    runner = CliRunner()
+    result = runner.invoke(app, ["create", "one", "bad", "one", *options])
+    assert result.exit_code == 1, result.output
+    summary = json.loads(result.output)
+    assert summary["succeeded"] == 1 and summary["failed"] == 1
+    assert len(calls) == 2
+    keys = {b["name"]: b["request_key"] for b in calls}
+    assert len(set(keys.values())) == 2
+    assert all(b["prompt"] == "hello" and b["disposable"] and not b["wait"] for b in calls)
+    calls.clear()
+    runner.invoke(app, ["create", "bad", "one", *options])
+    assert {b["name"]: b["request_key"] for b in calls} == keys
+    calls.clear()
+    single = runner.invoke(
+        app,
+        [
+            "create",
+            "one",
+            "--agent",
+            "codex",
+            "--prompt",
+            "hello",
+            "--disposable",
+            "--request-key",
+            keys["one"],
+            "--json",
+        ],
+    )
+    assert single.exit_code == 0, single.output
+    assert calls[0]["request_key"] == keys["one"]
+
+
+def test_bulk_create_invalid_name_no_mutations(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+
+    def request(*args, **kwargs):
+        pytest.fail("Invalid batch must not create any computers")
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    result = CliRunner().invoke(app, ["create", "valid", "bad/name", "--agent", "codex"])
+    assert result.exit_code == 2, result.output

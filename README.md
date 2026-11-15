@@ -1114,3 +1114,23 @@ an empty inventory. Single-name success responses retain their existing format.
 A successful request can still report `saving` or `deleting`: inspect the computer
 to confirm completion. Batches are not atomic and failures are not automatically
 retried. These bulk commands are available in hosted mode.
+
+### Create multiple computers
+
+```sh
+vmnest create dev staging worker --agent codex --parallel 4
+vmnest create task-one task-two --agent claude --disposable --prompt "Check your environment" --json
+vmnest create dev staging --agent codex --request-key rollout-001 --json
+```
+
+Hosted creation accepts multiple names. All options, including the initial prompt,
+apply to every computer. Duplicate names are submitted once; concurrency defaults
+to 4 and is limited by `--parallel` (1–16). Each accepted creation continues in the
+background; use `vmnest wait NAME` to wait for readiness. Account limits still apply.
+
+Bulk JSON reports each creation result or error, with exit status 1 if any request
+fails. Reuse the batch `--request-key` with the same names and options to retry the
+batch safely. Each result also includes its own derived request key: use that key
+when retrying just one computer. Failed requests do not roll back successful ones.
+Single-computer creation keeps its existing response format. Self-hosted creation
+continues to accept one name at a time.

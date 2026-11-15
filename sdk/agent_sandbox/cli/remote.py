@@ -29,6 +29,9 @@ def routed(function):
             if kwargs.get("cpus", 1) != 1 or kwargs.get("memory", 512) != 512:
                 raise SandboxError("Machine size is configured by the backend image")
             name = kwargs.get("name")
+            names = list(dict.fromkeys(name)) if operation == "create" else None
+            if names:
+                name = names[0]
             path = vm_path(name) if name else "/v1/vms"
             if operation == "create":
                 from .agent_defaults import resolve_agent
@@ -60,6 +63,16 @@ def routed(function):
                     body["profile"] = kwargs["profile"]
                 if text is not None:
                     body["prompt"] = text
+                if len(names) > 1:
+                    from .bulk import create_many
+
+                    return create_many(
+                        names,
+                        body,
+                        kwargs.get("parallel", 4),
+                        kwargs.get("as_json", False),
+                        request,
+                    )
                 result = request("POST", "/v1/vms", body)
                 result["request_key"] = key
                 if kwargs.get("as_json"):

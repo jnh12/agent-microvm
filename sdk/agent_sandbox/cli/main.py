@@ -184,7 +184,8 @@ def create(
     prompt: str | None = typer.Option(None, "--prompt"),
     prompt_file: Path | None = typer.Option(None, "--prompt-file"),
     as_json: bool = typer.Option(False, "--json"),
-    name: str = typer.Argument(..., help="Sandbox name."),
+    name: list[str] = typer.Argument(..., help="Computer names; multiple names in hosted mode."),
+    parallel: int = typer.Option(4, "--parallel", min=1, max=16),
     profile: str | None = typer.Option(
         None, "--profile", help="Saved hosted Codex integration profile."
     ),
@@ -209,7 +210,10 @@ def create(
     ),
     request_key: str | None = typer.Option(None, "--request-key", help="Remote retry identity."),
 ) -> None:
-    """Create and start a named sandbox."""
+    """Create and start one or more named computers."""
+    if len(name) != 1:
+        _fail("Bulk creation requires hosted mode")
+    name = name[0]
     if idle_minutes is not None:
         _fail("--idle-minutes requires hosted mode")
     if prompt is not None or prompt_file is not None:

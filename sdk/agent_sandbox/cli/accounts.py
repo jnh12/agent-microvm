@@ -18,6 +18,7 @@ from agent_sandbox.accounts import (
     credential_store,
     mode,
     normalize_url,
+    public_account,
     read_config,
     save_config,
     secret,
@@ -293,7 +294,7 @@ def register(app: typer.Typer):
                     {
                         "ok": True,
                         "status": "authenticated",
-                        "account": result["user"],
+                        "account": public_account(result["user"]),
                         "expires_at": result["expires_at"],
                     },
                     as_json,

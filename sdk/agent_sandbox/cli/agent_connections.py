@@ -188,6 +188,7 @@ def connect(
         f"/v1/agent-connections/{provider}",
         body={"credentials": payload, "replace": replace},
     )
+    result = {key: result[key] for key in ("provider", "status") if key in result}
     try:
         chosen = select(integration, all_integrations, no_integrations, yes or as_json, provider)
         configured = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})

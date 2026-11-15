@@ -46,3 +46,43 @@ def test_saved_hosted_mode_and_explicit_direct_override(monkeypatch, tmp_path):
     assert remote.remote_url() == "https://service.test"
     monkeypatch.setenv("VMNEST_MODE", "self-hosted")
     assert remote.remote_url() == ""
+
+
+def test_account_client_filters_private_fields(monkeypatch):
+    monkeypatch.setattr(
+        accounts.AccountClient,
+        "authenticated",
+        lambda *args: {
+            "id": "user",
+            "login": "alice",
+            "is_admin": False,
+            "token": "synthetic-session",
+            "secret": "synthetic-private",
+            "password_hash": "synthetic-hash",
+        },
+    )
+    value = accounts.AccountClient("https://service.test").account()
+    assert value == {"id": "user", "login": "alice", "is_admin": False}
+
+
+def test_cli_whoami_never_prints_private_account_fields(monkeypatch):
+    import json
+
+    from agent_sandbox.cli.main import app
+    from typer.testing import CliRunner
+
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "https://service.test")
+    monkeypatch.setattr(
+        accounts.AccountClient,
+        "authenticated",
+        lambda *args: {
+            "id": "user",
+            "login": "alice",
+            "secret": "synthetic-secret",
+        },
+    )
+    result = CliRunner().invoke(app, ["whoami", "--json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["account"] == {"id": "user", "login": "alice"}
+    assert "synthetic-secret" not in result.output

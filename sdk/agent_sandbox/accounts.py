@@ -17,6 +17,16 @@ class AccountError(Exception):
         self.code = code
 
 
+def public_account(value):
+    if not isinstance(value, dict):
+        raise AccountError("SERVICE_ERROR", "Invalid account response.")
+    return {
+        key: value[key]
+        for key in ("id", "github_id", "login", "created_at", "expires_at", "is_admin")
+        if key in value
+    }
+
+
 def config_path() -> Path:
     return Path(os.environ.get("VMNEST_CONFIG", str(Path.home() / ".vmnest" / "config.json")))
 
@@ -179,8 +189,7 @@ class AccountClient:
                     ),
                     "REQUEST_CONFLICT": "This request key was already used for different input.",
                     "DISCOVERY_UNAVAILABLE": (
-                        "Integration discovery is unavailable; retry later or contact the "
-                        "operator."
+                        "Integration discovery is unavailable; retry later or contact the operator."
                     ),
                     "CONNECTION_CHANGED": "The agent connection changed. Try again.",
                     "AGENT_NOT_CONNECTED": "Connect your Codex account first.",
@@ -214,7 +223,7 @@ class AccountClient:
             raise AccountError("SERVICE_UNAVAILABLE", "Cannot reach the account service.") from None
 
     def account(self):
-        return self.authenticated("GET", "/v1/account")
+        return public_account(self.authenticated("GET", "/v1/account"))
 
     def authenticated(self, method, path, **kwargs):
         token = secret(self.url, "session")

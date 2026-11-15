@@ -1,7 +1,9 @@
 """Connect existing local subscription logins to a VMNest account."""
 
 import json
+import math
 import sys
+import time
 from pathlib import Path
 from typing import Literal
 
@@ -21,6 +23,42 @@ app.add_typer(profiles_app, name="profile")
 register_runs(app)
 register_models(app)
 Provider = Literal["codex", "claude"]
+
+
+def require_fresh_credentials(provider, payload):
+    if provider != "claude":
+        return
+    try:
+        expires = float(payload["claudeAiOauth"]["expiresAt"]) / 1000
+    except (KeyError, TypeError, ValueError, OverflowError):
+        expires = 0
+    if not math.isfinite(expires) or expires <= time.time() + 300:
+        raise AccountError(
+            "LOCAL_AUTH_EXPIRED",
+            "The selected Claude login is expired, near expiry, or missing its expiry. "
+            "Run claude auth login for this credential source, then "
+            "vmnest agent connect --provider claude --replace. No credentials were uploaded.",
+        )
+
+
+def configuration_error(exc, provider, *, uploaded=False):
+    prefix = (
+        "Credentials were saved, but integration defaults were not updated. " if uploaded else ""
+    )
+    if exc.code == "AGENT_RECONNECT_REQUIRED":
+        login = "claude auth login" if provider == "claude" else "codex login"
+        return AccountError(
+            exc.code,
+            prefix + f"The {provider} login could not be refreshed. Run {login}, "
+            f"then vmnest agent connect --provider {provider} --replace. "
+            "Repeating the upload without refreshing the local login will not repair it.",
+        )
+    return AccountError(
+        exc.code,
+        prefix
+        + str(exc)
+        + (f" Retry with vmnest agent configure --provider {provider}." if uploaded else ""),
+    )
 
 
 @app.command("default")
@@ -176,6 +214,7 @@ def connect(
                 "Choose an available --source: " + (", ".join(found) or "none"),
             )
         payload = found[source]
+    require_fresh_credentials(provider, payload)
     if not yes:
         if as_json or not sys.stdin.isatty():
             raise AccountError("CONSENT_REQUIRED", "Use --yes to authorize credential upload.")
@@ -194,12 +233,7 @@ def connect(
         configured = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
         result["integrations"] = configured["integrations"]
     except AccountError as exc:
-        raise AccountError(
-            exc.code,
-            "Credentials were saved, but integration defaults were not updated. "
-            "Use vmnest agent configure. "
-            + str(exc),
-        ) from None
+        raise configuration_error(exc, provider, uploaded=True) from None
     typer.echo(
         json.dumps(result)
         if as_json
@@ -284,12 +318,35 @@ def integrations(
 @app.command()
 @handled
 def configure(
-    provider: Provider = typer.Option("codex", "--provider"),
+    provider: Provider | None = typer.Option(None, "--provider"),
     integration: list[str] | None = typer.Option(None, "--integration"),
     all_integrations: bool = typer.Option(False, "--all-integrations"),
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
-    chosen = select(integration, all_integrations, no_integrations, as_json, provider)
-    result = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
+    from .agent_models import interactive_terminal
+
+    if provider is None:
+        connected = [
+            item["provider"]
+            for item in api("GET", "/v1/agent-connections")["items"]
+            if item["provider"] in ("codex", "claude")
+        ]
+        if len(connected) == 1:
+            provider = connected[0]
+        elif not connected:
+            raise AccountError("NOT_CONNECTED", "Connect an agent account first.")
+        elif as_json or not interactive_terminal():
+            raise AccountError(
+                "PROVIDER_REQUIRED", "Specify --provider codex or --provider claude."
+            )
+        else:
+            provider = typer.prompt("Configure provider (" + ", ".join(connected) + ")").strip()
+            if provider not in connected:
+                raise AccountError("INVALID_PROVIDER", "Select a connected provider.")
+    try:
+        chosen = select(integration, all_integrations, no_integrations, as_json, provider)
+        result = api("PATCH", f"/v1/agent-connections/{provider}", {"integrations": chosen})
+    except AccountError as exc:
+        raise configuration_error(exc, provider) from None
     typer.echo(json.dumps(result) if as_json else f"{provider} defaults saved for future VMs.")

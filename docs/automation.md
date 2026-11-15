@@ -11,6 +11,22 @@ see [Webhooks](webhooks.md). Management commands are available under `vmnest web
 Use [`vmnest defaults`](cloud-defaults.md) to manage account environment secrets
 and startup scripts shared with website Settings.
 
+## Connecting agent accounts
+
+For Claude, refresh an expired local login with `claude auth login` before
+uploading it. VMNest rejects expired, near-expiry, or undated Claude credentials
+locally, so a stale upload cannot replace the saved cloud connection. Then use
+`vmnest agent connect --provider claude --replace`; unattended callers also
+provide `--yes` and an explicit integration selection. Replacing a saved copy
+alone does not refresh the local provider login.
+
+`vmnest agent configure --provider claude` selects Claude explicitly. Without
+`--provider`, a single connected provider is selected automatically; with two,
+interactive use prompts and unattended use fails with `PROVIDER_REQUIRED`.
+Profile creation prompts for a missing name interactively; agents must provide
+the name, for example `vmnest agent profile create support --provider claude
+--no-integrations --json`.
+
 ## Submit, observe, and control
 
 ```sh

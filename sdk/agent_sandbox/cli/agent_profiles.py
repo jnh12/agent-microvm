@@ -132,7 +132,7 @@ def emit(result, as_json):
 @app.command("create")
 @handled
 def create(
-    name: str,
+    name: str | None = typer.Argument(None),
     instructions: str | None = typer.Option(None, "--instructions"),
     instructions_file: str | None = typer.Option(None, "--instructions-file"),
     setup_command: str | None = typer.Option(None, "--setup"),
@@ -151,6 +151,21 @@ def create(
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
+    from .agent_models import interactive_terminal
+
+    if name is None:
+        if as_json or not interactive_terminal():
+            raise AccountError(
+                "NAME_REQUIRED",
+                "Supply a profile name, for example: vmnest agent profile create support.",
+            )
+        name = typer.prompt("Profile name").strip()
+    if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_-]{0,62}", name):
+        raise AccountError(
+            "INVALID_REQUEST",
+            "Use a profile name starting with a letter, followed by letters, numbers, "
+            "hyphens or underscores (max 63 characters).",
+        )
     settings = workflow(instructions, instructions_file, setup_command, timeout)
     selected = select(integration, all_integrations, no_integrations, as_json, provider)
     from .agent_models import choose

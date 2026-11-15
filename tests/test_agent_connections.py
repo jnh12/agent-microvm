@@ -1,4 +1,5 @@
 import json
+import time
 
 import pytest
 from agent_sandbox.accounts import AccountError
@@ -34,6 +35,7 @@ def test_upload_requires_consent_and_does_not_echo_secret(tmp_path, monkeypatch)
                 "claudeAiOauth": {
                     "accessToken": "sensitive-access",
                     "refreshToken": "sensitive-refresh",
+                    "expiresAt": int((time.time() + 3600) * 1000),
                 }
             }
         )

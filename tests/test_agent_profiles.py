@@ -72,7 +72,9 @@ def test_interactive_selection_and_default_configuration(api, monkeypatch):
     response = runner.invoke(app, ["profile", "create", "dev"], input="1,2\n")
     assert response.exit_code == 0, response.output
     assert api[-1][2]["integrations"] == ["gh", "mail"]
-    response = runner.invoke(app, ["configure", "--all-integrations", "--json"])
+    response = runner.invoke(
+        app, ["configure", "--provider", "codex", "--all-integrations", "--json"]
+    )
     assert response.exit_code == 0, response.output
     assert api[-1] == ("PATCH", "/v1/agent-connections/codex", {"integrations": "all"})
 

@@ -1089,3 +1089,28 @@ API: GET `/v1/agent-connections/{provider}/models`; GET/PUT
 `/v1/agent-connections/{provider}/model-defaults` with `model` and `effort`.
 Run and profile schemas also accept `effort`; it persists through queueing and restoration.
 The catalog describes runtime-supported choices; providers still enforce account access.
+
+### Bulk computer operations
+
+`open`, `shutdown`, and `delete` accept multiple computer names or `--all`:
+
+```sh
+vmnest open dev staging
+vmnest shutdown dev staging --json
+vmnest shutdown --all --parallel 4
+vmnest delete --all --dry-run
+vmnest delete scratch-one scratch-two
+```
+
+`--all` selects a snapshot of your computer inventory. It cannot be combined with
+names. Duplicate names are processed once. `--dry-run` displays the targets without
+changing them, including for permanent deletion. `--parallel` limits concurrent
+requests (default 4, range 1–16).
+
+Each computer is handled independently. Bulk `--json` returns one object containing
+`action`, `ok`, `succeeded`, `failed`, and ordered `items` with each name and either
+its result or error. Exit status is 1 if any operation fails, otherwise 0, including
+an empty inventory. Single-name success responses retain their existing format.
+A successful request can still report `saving` or `deleting`: inspect the computer
+to confirm completion. Batches are not atomic and failures are not automatically
+retried. These bulk commands are available in hosted mode.

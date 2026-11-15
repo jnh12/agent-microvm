@@ -123,46 +123,51 @@ def register(app):
 
     @app.command("open")
     @handled
-    def open_computer(name: str, as_json: bool = typer.Option(False, "--json")):
-        """Return to your computer. Wake it automatically when needed."""
-        from agent_sandbox.errors import SandboxError
+    def open_computer(
+        names: list[str] = typer.Argument(None, help="Computer names."),
+        all_computers: bool = typer.Option(False, "--all", help="Select all your computers."),
+        parallel: int = typer.Option(4, "--parallel", min=1, max=16),
+        dry_run: bool = typer.Option(
+            False, "--dry-run", help="Show targets without changing them."
+        ),
+        as_json: bool = typer.Option(False, "--json"),
+    ):
+        """Open one or more computers, waking them when needed."""
+        from .bulk import lifecycle
 
-        from .main import _fail
-
-        try:
-            present(request("POST", vm_path(name) + "/open"), as_json)
-        except SandboxError as exc:
-            _fail(str(exc))
+        lifecycle("open", names, all_computers, parallel, dry_run, as_json, request, present)
 
     @app.command("shutdown")
     @handled
-    def shutdown(name: str, as_json: bool = typer.Option(False, "--json")):
-        """Save and shut down a computer. Open it later to resume."""
-        from agent_sandbox.errors import SandboxError
+    def shutdown(
+        names: list[str] = typer.Argument(None, help="Computer names."),
+        all_computers: bool = typer.Option(False, "--all", help="Select all your computers."),
+        parallel: int = typer.Option(4, "--parallel", min=1, max=16),
+        dry_run: bool = typer.Option(
+            False, "--dry-run", help="Show targets without changing them."
+        ),
+        as_json: bool = typer.Option(False, "--json"),
+    ):
+        """Save and shut down one or more computers."""
+        from .bulk import lifecycle
 
-        from .main import _fail
-
-        try:
-            present(request("POST", vm_path(name) + "/shutdown"), as_json)
-        except SandboxError as exc:
-            _fail(str(exc))
+        lifecycle("shutdown", names, all_computers, parallel, dry_run, as_json, request, present)
 
     @app.command("delete")
     @handled
-    def delete(name: str, as_json: bool = typer.Option(False, "--json")):
-        """Permanently delete a computer, its saved workspace, and chat history."""
-        from agent_sandbox.errors import SandboxError
+    def delete(
+        names: list[str] = typer.Argument(None, help="Computer names."),
+        all_computers: bool = typer.Option(False, "--all", help="Select all your computers."),
+        parallel: int = typer.Option(4, "--parallel", min=1, max=16),
+        dry_run: bool = typer.Option(
+            False, "--dry-run", help="Show targets without changing them."
+        ),
+        as_json: bool = typer.Option(False, "--json"),
+    ):
+        """Permanently delete computers, saved workspaces, and chat history."""
+        from .bulk import lifecycle
 
-        from .main import _fail
-
-        try:
-            result = request("DELETE", vm_path(name) + "?permanent=true")
-            if as_json:
-                details(result, True)
-            else:
-                typer.echo(f"{name}: {result['status']}")
-        except SandboxError as exc:
-            _fail(str(exc))
+        lifecycle("delete", names, all_computers, parallel, dry_run, as_json, request, present)
 
     @app.command("wait")
     @handled

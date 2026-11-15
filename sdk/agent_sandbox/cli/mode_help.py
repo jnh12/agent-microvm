@@ -39,7 +39,6 @@ HOSTED_CREATE_OPTIONS = {
     "prompt_file",
     "approvals",
     "disposable",
-    "repository",
     "setup_command",
     "as_json",
     "idle_minutes",

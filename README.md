@@ -959,14 +959,14 @@ into permission prompts; sudo-enabled images retain passwordless sudo either way
 ### Hosted saved projects
 
 ```sh
-vmnest create dev --agent codex --repo https://github.com/octocat/Hello-World.git --setup "sudo apt-get update && sudo apt-get install -y jq" --prompt "Explain this project"
+vmnest create dev --agent codex --setup "sudo apt-get update && sudo apt-get install -y jq" --prompt "Check that jq is installed"
 vmnest project logs dev
 vmnest open dev
 vmnest agent chat dev
 ```
 
-Repository/setup options also work with Claude and ordinary hosted VMs. Repositories
-currently require public HTTPS URLs. Setup runs once on each new or restored VM;
+The setup option also works with Claude and ordinary hosted VMs.
+Setup runs once on each new or restored VM;
 use idempotent commands to recreate system dependencies while preserving workspace
 files. Inspect the VM for setup status. `vmnest project retry dev` explicitly retries
 a failed setup; interrupted setup requires reconciliation. `--disposable` opts out

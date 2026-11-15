@@ -54,14 +54,12 @@ def test_create_project_options(monkeypatch):
         [
             "create",
             "dev",
-            "--repo",
-            "https://github.com/octocat/Hello-World.git",
             "--setup",
             "npm install",
         ],
     )
     assert result.exit_code == 0, result.output
-    assert calls[-1]["repository"] == "https://github.com/octocat/Hello-World.git"
+    assert "repository" not in calls[-1]
     assert calls[-1]["setup_command"] == "npm install"
 
 

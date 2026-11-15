@@ -41,7 +41,7 @@ def routed(function):
                         raise SandboxError("--prompt requires --agent")
                     text = prompt_text(kwargs.get("prompt"), kwargs.get("prompt_file"))
                 body = {"name": name, "request_key": key, "wait": False}
-                for field in ("repository", "setup_command", "idle_minutes"):
+                for field in ("setup_command", "idle_minutes"):
                     if kwargs.get(field) is not None:
                         body[field] = kwargs[field]
                 if kwargs.get("approvals"):

@@ -34,7 +34,6 @@ def test_options(monkeypatch, selected):
     text = help_text(monkeypatch, selected, "create")
     hosted = [
         "--agent",
-        "--repo",
         "--setup",
         "--profile",
         "--prompt",

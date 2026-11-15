@@ -169,9 +169,6 @@ def create(
         max=15,
         help="Hosted idle shutdown in minutes; default 5, maximum 15.",
     ),
-    repository: str | None = typer.Option(
-        None, "--repo", help="HTTPS Git repository to clone into /workspace/project."
-    ),
     setup_command: str | None = typer.Option(
         None, "--setup", help="Saved shell command to prepare each fresh or restored VM."
     ),
@@ -217,8 +214,8 @@ def create(
         _fail("--idle-minutes requires hosted mode")
     if prompt is not None or prompt_file is not None:
         _fail("Agent prompts apply only to remote mode")
-    if repository or setup_command:
-        _fail("--repo and --setup currently require hosted mode")
+    if setup_command:
+        _fail("--setup currently requires hosted mode")
     if approvals:
         _fail("--approvals applies only to hosted agent mode")
     if profile:

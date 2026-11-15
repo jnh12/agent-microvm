@@ -5,6 +5,9 @@ required values, and numeric bounds in the selected mode. Output has a
 `schema_version` so consumers can detect future changes. Existing command names
 and bulk operations are preserved.
 
+For external event triggers that run a disposable computer from a saved profile,
+see [Webhooks](webhooks.md). Management commands are available under `vmnest webhook`.
+
 ## Submit, observe, and control
 
 ```sh

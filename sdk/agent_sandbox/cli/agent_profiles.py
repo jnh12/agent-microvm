@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from pathlib import Path
 from typing import Literal
 from urllib.parse import quote
 
@@ -12,6 +13,25 @@ from agent_sandbox.accounts import AccountClient, AccountError, service_url
 from agent_sandbox.cli.accounts import handled
 
 app = typer.Typer(name="profile", help="Manage account-owned agent integration profiles.")
+
+
+def workflow(instructions, instructions_file, setup_command, timeout):
+    if instructions is not None and instructions_file is not None:
+        raise AccountError("INVALID_REQUEST", "Choose --instructions or --instructions-file.")
+    if instructions_file is not None:
+        try:
+            instructions = Path(instructions_file).read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            raise AccountError("INVALID_REQUEST", "Could not read the instructions file.") from None
+    return {
+        key: value
+        for key, value in {
+            "instructions": instructions,
+            "setup_command": setup_command,
+            "timeout_seconds": timeout,
+        }.items()
+        if value is not None
+    }
 
 
 def api(method, path, body=None):
@@ -113,6 +133,16 @@ def emit(result, as_json):
 @handled
 def create(
     name: str,
+    instructions: str | None = typer.Option(None, "--instructions"),
+    instructions_file: str | None = typer.Option(None, "--instructions-file"),
+    setup_command: str | None = typer.Option(None, "--setup"),
+    timeout: int | None = typer.Option(
+        None,
+        "--timeout",
+        min=60,
+        max=3600,
+        help="Webhook lifetime in seconds, including queue and setup.",
+    ),
     effort: str | None = typer.Option(None, "--effort"),
     model: str | None = typer.Option(None, "--model"),
     provider: Literal["codex", "claude"] = typer.Option("codex", "--provider"),
@@ -121,6 +151,7 @@ def create(
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
+    settings = workflow(instructions, instructions_file, setup_command, timeout)
     selected = select(integration, all_integrations, no_integrations, as_json, provider)
     from .agent_models import choose
 
@@ -133,6 +164,7 @@ def create(
                 "name": name,
                 "provider": provider,
                 "integrations": selected,
+                **settings,
                 **({"model": model} if model is not None else {}),
                 **({"effort": effort} if effort is not None else {}),
             },
@@ -145,6 +177,10 @@ def create(
 @handled
 def update(
     name: str,
+    instructions: str | None = typer.Option(None, "--instructions"),
+    instructions_file: str | None = typer.Option(None, "--instructions-file"),
+    setup_command: str | None = typer.Option(None, "--setup", help="Empty string clears setup."),
+    timeout: int | None = typer.Option(None, "--timeout", min=60, max=3600),
     effort: str | None = typer.Option(None, "--effort"),
     model: str | None = typer.Option(
         None, "--model", help="Set model; default resets to provider default."
@@ -154,6 +190,7 @@ def update(
     no_integrations: bool = typer.Option(False, "--no-integrations"),
     as_json: bool = typer.Option(False, "--json"),
 ):
+    settings = workflow(instructions, instructions_file, setup_command, timeout)
     saved = api("GET", "/v1/agent-profiles/" + quote(name, safe=""))
     provider = saved["provider"]
     from .agent_models import choose
@@ -161,12 +198,12 @@ def update(
     model, effort = choose(
         provider, model, effort, as_json=as_json, current_model=saved.get("model")
     )
-    body = {}
+    body = settings
     if model is not None:
         body["model"] = model
     if effort is not None:
         body["effort"] = effort
-    if (model is None and effort is None) or integration or all_integrations or no_integrations:
+    if (not body) or integration or all_integrations or no_integrations:
         body["integrations"] = select(
             integration, all_integrations, no_integrations, as_json, provider
         )
@@ -180,6 +217,15 @@ def update(
 @handled
 def listing(as_json: bool = typer.Option(False, "--json")):
     emit(api("GET", "/v1/agent-profiles"), as_json)
+
+
+@app.command("inspect")
+@handled
+def inspect(name: str, as_json: bool = typer.Option(False, "--json")):
+    """Show all saved profile settings, including webhook instructions."""
+    from .output import details
+
+    details(api("GET", "/v1/agent-profiles/" + quote(name, safe="")), as_json)
 
 
 @app.command("delete")

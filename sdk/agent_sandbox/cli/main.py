@@ -31,6 +31,7 @@ from .remote import register_files, routed
 from .runtime import get_current_context
 from .schema import register as register_schema
 from .state import SandboxRecord, StateStore
+from .webhooks import app as webhook_app
 
 app = ModeApp(
     cls=ModeGroup,
@@ -44,6 +45,7 @@ app.add_typer(image_app)
 
 app.add_typer(agent_app)
 app.add_typer(project_app, name="project")
+app.add_typer(webhook_app)
 infra_app = typer.Typer(
     name="infra",
     help="Deploy/manage MicroVM infrastructure from sandbox.yaml.",

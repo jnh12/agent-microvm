@@ -26,7 +26,7 @@ vmnest logs demo
 vmnest metrics demo
 vmnest forward demo --remote-port 8081 --local-port 8081
 vmnest shutdown demo
-vmnest open demo
+vmnest wake demo
 vmnest usage
 vmnest run default -- python3 -c "print('ephemeral')"
 ```

@@ -38,7 +38,8 @@ def lifecycle(action, names, all_computers, parallel, dry_run, as_json, request,
     def perform(name):
         path = vm_path(name)
         method = "DELETE" if action == "delete" else "POST"
-        path += "?permanent=true" if action == "delete" else "/" + action
+        endpoint = "open" if action == "wake" else action
+        path += "?permanent=true" if action == "delete" else "/" + endpoint
         try:
             return {"name": name, "ok": True, "result": request(method, path)}
         except (SandboxError, AccountError) as exc:

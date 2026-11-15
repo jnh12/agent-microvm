@@ -28,7 +28,7 @@ def calls(monkeypatch):
 @pytest.mark.parametrize(
     "command,method,suffix",
     [
-        ("open", "POST", "/open"),
+        ("wake", "POST", "/open"),
         ("shutdown", "POST", "/shutdown"),
         ("delete", "DELETE", "?permanent=true"),
     ],

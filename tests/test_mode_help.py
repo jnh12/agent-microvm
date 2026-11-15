@@ -19,7 +19,7 @@ def test_root_switches_without_mutation(monkeypatch):
     for selected in ("hosted", "self-hosted", "hosted"):
         text = help_text(monkeypatch, selected)
         assert "create" in text and "upload" in text and "setup" in text
-        for name in ("agent", "project", "open", "wait", "login"):
+        for name in ("agent", "project", "wake", "wait", "login"):
             assert (re.search(r"\u2502\s+" + re.escape(name) + r"\s{2,}", text) is not None) == (
                 selected == "hosted"
             )
@@ -79,7 +79,7 @@ def test_saved_mode_and_offline_help(monkeypatch):
 
 @pytest.mark.parametrize(
     "selected,command",
-    [("hosted", "infra"), ("self-hosted", "agent"), ("self-hosted", "open")],
+    [("hosted", "infra"), ("self-hosted", "agent"), ("self-hosted", "wake")],
 )
 def test_mode_errors(monkeypatch, selected, command):
     monkeypatch.setenv("VMNEST_MODE", selected)

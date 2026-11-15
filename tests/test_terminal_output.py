@@ -139,7 +139,7 @@ def test_open_and_list_keep_physical_lifecycle_out_of_human_output(monkeypatch):
         return {**row, "status": "ready", "state": "RUNNING"}
 
     monkeypatch.setattr("agent_sandbox.cli.computers.request", request)
-    opened = runner.invoke(app, ["open", "dev"])
+    opened = runner.invoke(app, ["wake", "dev"])
     assert opened.exit_code == 0 and "ready" in opened.output, opened.output
     assert calls == [("POST", "/v1/vms/dev/open")]
     assert "physical-secret-id" not in opened.output

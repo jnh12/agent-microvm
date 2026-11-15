@@ -13,7 +13,7 @@ HOSTED = {
     "whoami",
     "agent",
     "project",
-    "open",
+    "wake",
     "wait",
     "shutdown",
     "delete",

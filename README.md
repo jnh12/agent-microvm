@@ -942,7 +942,7 @@ saved account connections. These commands require the corresponding service
 update; adding the CLI alone does not enable them on an older hosted deployment.
 
 Hosted computers and agents keep their names, workspace files, and conversations.
-Create once, then use `vmnest open NAME`, `vmnest exec NAME -- COMMAND`, or
+Create once, then use `vmnest wake NAME`, `vmnest exec NAME -- COMMAND`, or
 `vmnest agent chat NAME` whenever you return. They wake automatically if needed.
 After 5 minutes idle by default, the service saves before shutting down compute. Active agent
 work, guest background jobs, and connection leases keep it awake.
@@ -961,7 +961,7 @@ into permission prompts; sudo-enabled images retain passwordless sudo either way
 ```sh
 vmnest create dev --agent codex --setup "sudo apt-get update && sudo apt-get install -y jq" --prompt "Check that jq is installed"
 vmnest project logs dev
-vmnest open dev
+vmnest wake dev
 vmnest agent chat dev
 ```
 
@@ -983,7 +983,7 @@ and infrastructure outputs use readable summaries or tables. Use `--json` for sc
 ```sh
 vmnest ls
 vmnest ls --json
-vmnest open dev
+vmnest wake dev
 vmnest inspect dev --json
 vmnest agent chat dev
 ```
@@ -1053,7 +1053,7 @@ Renaming keeps the CLI identifier (`dev`) unchanged. Power off before changing
 model, effort, or integrations; changes apply on the next start. Both commands
 support `--json`.
 
-`vmnest shutdown NAME` saves the workspace before stopping compute. Use `vmnest open NAME`
+`vmnest shutdown NAME` saves the workspace before stopping compute. Use `vmnest wake NAME`
 or agent chat to return. Active agent runs or background work must finish or be cancelled first.
 Disposable computers stop without saving.
 
@@ -1092,10 +1092,10 @@ The catalog describes runtime-supported choices; providers still enforce account
 
 ### Bulk computer operations
 
-`open`, `shutdown`, and `delete` accept multiple computer names or `--all`:
+`wake`, `shutdown`, and `delete` accept multiple computer names or `--all`:
 
 ```sh
-vmnest open dev staging
+vmnest wake dev staging
 vmnest shutdown dev staging --json
 vmnest shutdown --all --parallel 4
 vmnest delete --all --dry-run

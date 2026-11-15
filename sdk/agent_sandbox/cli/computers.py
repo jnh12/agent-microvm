@@ -121,9 +121,9 @@ def register(app):
             )
         details(api("POST", route, body), as_json)
 
-    @app.command("open")
+    @app.command("wake")
     @handled
-    def open_computer(
+    def wake_computer(
         names: list[str] = typer.Argument(None, help="Computer names."),
         all_computers: bool = typer.Option(False, "--all", help="Select all your computers."),
         parallel: int = typer.Option(4, "--parallel", min=1, max=16),
@@ -132,10 +132,10 @@ def register(app):
         ),
         as_json: bool = typer.Option(False, "--json"),
     ):
-        """Open one or more computers, waking them when needed."""
+        """Wake one or more saved computers."""
         from .bulk import lifecycle
 
-        lifecycle("open", names, all_computers, parallel, dry_run, as_json, request, present)
+        lifecycle("wake", names, all_computers, parallel, dry_run, as_json, request, present)
 
     @app.command("shutdown")
     @handled
@@ -204,7 +204,7 @@ def register(app):
                         error or "Computer could not become ready; inspect it for details"
                     )
                 if status == "sleeping":
-                    raise SandboxError(f"Computer is sleeping; use vmnest open {name}")
+                    raise SandboxError(f"Computer is sleeping; use vmnest wake {name}")
                 if time.monotonic() >= deadline:
                     raise SandboxError("Timed out waiting; startup continues on the server")
                 time.sleep(interval)

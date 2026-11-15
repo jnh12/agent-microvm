@@ -8,6 +8,9 @@ and bulk operations are preserved.
 For external event triggers that run a disposable computer from a saved profile,
 see [Webhooks](webhooks.md). Management commands are available under `vmnest webhook`.
 
+Use [`vmnest defaults`](cloud-defaults.md) to manage account environment secrets
+and startup scripts shared with website Settings.
+
 ## Submit, observe, and control
 
 ```sh

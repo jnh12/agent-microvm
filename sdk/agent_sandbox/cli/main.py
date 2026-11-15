@@ -23,6 +23,7 @@ from agent_sandbox.sandbox import ENV_IMAGE_ARN, ENV_ROLE_ARN, Sandbox
 
 from .accounts import register as register_accounts
 from .agent_connections import app as agent_app
+from .cloud_defaults import app as defaults_app
 from .computers import register as register_computers
 from .mode_help import ModeApp, ModeGroup, selected_mode, unavailable
 from .output import details
@@ -46,6 +47,7 @@ app.add_typer(image_app)
 app.add_typer(agent_app)
 app.add_typer(project_app, name="project")
 app.add_typer(webhook_app)
+app.add_typer(defaults_app)
 infra_app = typer.Typer(
     name="infra",
     help="Deploy/manage MicroVM infrastructure from sandbox.yaml.",

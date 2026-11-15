@@ -204,6 +204,15 @@ class AccountClient:
                         "A connection is already saved. Use --replace to explicitly replace it."
                     ),
                     "INVALID_REQUEST": "Unsupported or invalid request data.",
+                    "INVALID_DEFAULTS": (
+                        "Invalid cloud defaults. Check variable names, reserved runtime names, "
+                        "and size limits."
+                    ),
+                    "DEFAULTS_CHANGED": (
+                        "Defaults changed in another session. Review them with "
+                        "vmnest defaults list before retrying."
+                    ),
+                    "PAYLOAD_TOO_LARGE": "The request exceeds the service size limit.",
                     "AUTH_REQUIRED": "Sign in with vmnest login.",
                     "AUTH_EXPIRED": "Session invalid or revoked. Run vmnest login.",
                     "LOGIN_EXPIRED": "Login expired. Run vmnest login again.",

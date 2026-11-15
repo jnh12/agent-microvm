@@ -8,6 +8,7 @@ from typer.core import TyperCommand, TyperGroup
 from agent_sandbox.accounts import AccountError, mode
 
 HOSTED = {
+    "defaults",
     "webhook",
     "login",
     "logout",

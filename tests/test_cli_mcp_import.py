@@ -13,6 +13,12 @@ import builtins
 from agent_sandbox.cli.main import _is_missing, app
 from typer.testing import CliRunner
 
+import pytest
+
+@pytest.fixture(autouse=True)
+def direct_mode(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "self-hosted")
+
 runner = CliRunner()
 
 # A compiled dependency built for the wrong architecture raises a bare

@@ -8,6 +8,12 @@ from agent_sandbox.cli.main import app
 from agent_sandbox.infra.state import InfraStateStore
 from typer.testing import CliRunner
 
+import pytest
+
+@pytest.fixture(autouse=True)
+def direct_mode(monkeypatch):
+    monkeypatch.setenv("VMNEST_MODE", "self-hosted")
+
 runner = CliRunner()
 
 

@@ -1,8 +1,8 @@
 [project]
 name = "vmnest"
-version = "0.1.3.dev22"
+version = "0.3.1"
 description = "Embeddable Python SDK + CLI for isolated microVM sandboxes on AWS Lambda MicroVMs (a Python fork of microsandbox concepts)."
-readme = "README.md"
+readme = "docs/production-install.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 dependencies = [

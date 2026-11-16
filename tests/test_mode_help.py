@@ -37,7 +37,6 @@ def test_options(monkeypatch, selected):
         "--setup",
         "--profile",
         "--prompt",
-        "--approvals",
         "--disposable",
         "--json",
         "--request-key",
@@ -73,8 +72,8 @@ def test_saved_mode_and_offline_help(monkeypatch):
         assert result.exit_code == 0, result.output
     config_path().unlink()
     result = runner.invoke(app, ["--help"])
-    assert "Choose a mode" in result.output
-    assert " infra " in result.output and " agent " in result.output
+    assert "Mode: hosted" in result.output
+    assert " infra " not in result.output and " agent " in result.output
 
 
 @pytest.mark.parametrize(

@@ -14,7 +14,7 @@ name: Publish
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, feat/agent-connections]
   workflow_dispatch:
     inputs:
       index:
@@ -74,7 +74,7 @@ jobs:
 
   publish-pypi:
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.index == 'pypi' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && inputs.index == 'pypi' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/agent-connections')
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

@@ -56,7 +56,7 @@ def save_config(value: dict) -> None:
 
 def mode() -> str | None:
     value = os.environ.get("VMNEST_MODE") or (
-        "hosted" if os.environ.get("VMNEST_API_URL") else read_config().get("mode")
+        "hosted" if os.environ.get("VMNEST_API_URL") else read_config().get("mode", "hosted")
     )
     if value not in (None, "hosted", "self-hosted"):
         raise AccountError("CONFIG_INVALID", "VMNEST_MODE must be hosted or self-hosted.")
@@ -90,12 +90,8 @@ def service_url(override: str | None = None) -> str:
         or os.environ.get("VMNEST_API_URL")
         or os.environ.get("VMNEST_URL")
         or read_config().get("url")
+        or "https://api.vmnest.cc"
     )
-    if not value:
-        raise AccountError(
-            "SERVICE_NOT_CONFIGURED",
-            "Run vmnest setup --mode hosted --url https://YOUR-ACCOUNT-SERVICE",
-        )
     return normalize_url(value)
 
 
@@ -150,7 +146,10 @@ class AccountClient:
         request_key: str | None = None,
         timeout: float = 20,
     ):
-        headers = {"Authorization": "Bearer " + token} if token else {}
+        headers = {
+            "X-VMNest-Client": "cli",
+            **({"Authorization": "Bearer " + token} if token else {}),
+        }
         if request_key:
             headers["Idempotency-Key"] = request_key
         try:
@@ -199,9 +198,6 @@ class AccountClient:
                         "A selected integration is unavailable. Check vmnest agent integrations."
                     ),
                     "PROFILE_NOT_FOUND": "Agent profile not found.",
-                    "WEBHOOK_ACTION_FORBIDDEN": "This action is not enabled for this webhook.",
-                    "WEBHOOK_LIMIT": "At most 50 active machine webhooks are allowed.",
-                    "WEBHOOK_TIMEOUT": "Delivery timed out before dispatch.",
                     "ENDPOINT_NOT_FOUND": "Event endpoint not found.",
                     "ENDPOINT_EXISTS": "An event endpoint already uses this name.",
                     "ENDPOINT_DISABLED": "Enable the event endpoint before sending a test.",
@@ -219,6 +215,15 @@ class AccountClient:
                         "Defaults changed in another session. Review them with "
                         "vmnest defaults list before retrying."
                     ),
+                    "WEBHOOK_ACTION_FORBIDDEN": "This action is not enabled for this webhook.",
+                    "WEBHOOK_LIMIT": "At most 50 active machine webhooks are allowed.",
+                    "WEBHOOK_TIMEOUT": "Delivery timed out before dispatch.",
+                    "WEBHOOK_NOT_FOUND": "Webhook not found. Use vmnest webhook list.",
+                    "WEBHOOK_REVOKED": "This webhook is revoked. Create a replacement webhook.",
+                    "WEBHOOK_EXISTS": "Webhook name already exists. Choose another name.",
+                    "WEBHOOK_RUN_NOT_FOUND": "Webhook run not found.",
+                    "WEBHOOK_AUTH_REQUIRED": "Webhook credentials are invalid or revoked.",
+                    "WEBHOOK_QUEUE_FULL": "The webhook queue is full. Retry later.",
                     "PAYLOAD_TOO_LARGE": "The request exceeds the service size limit.",
                     "AUTH_REQUIRED": "Sign in with vmnest login.",
                     "AUTH_EXPIRED": "Session invalid or revoked. Run vmnest login.",

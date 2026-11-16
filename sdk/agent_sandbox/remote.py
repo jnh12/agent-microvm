@@ -46,7 +46,7 @@ def request(method, path, body=None):
             timeout=httpx.Timeout(timeout, connect=min(10, timeout)), trust_env=False
         ) as client:
             response = client.request(
-                method, url + path, json=body, headers={"Authorization": "Bearer " + token}
+                method, url + path, json=body, headers={"Authorization": "Bearer " + token, "X-VMNest-Client": "cli"}
             )
         if response.is_error:
             try:

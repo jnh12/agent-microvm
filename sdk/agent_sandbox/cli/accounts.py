@@ -188,6 +188,8 @@ def register(app: typer.Typer):
         credential_store()  # Fail before creating a provider authorization.
         client = AccountClient(origin)
         config = read_config()
+        if website:
+            config["website_url"] = normalize_url(website)
         if secret(origin, "session"):
             try:
                 user = client.account()

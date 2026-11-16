@@ -90,9 +90,9 @@ def test_create_validates_prompt_before_creating_vm(monkeypatch):
 
     monkeypatch.setattr(remote, "remote_url", lambda: "https://example.test")
     calls = []
-    monkeypatch.setattr(remote, "request", lambda *a: calls.append(a))
+    monkeypatch.setattr(remote, "request", lambda *a: calls.append(a) or {"items": []})
     result = CliRunner().invoke(main_app, ["create", "dev", "--prompt", "hello"])
-    assert result.exit_code != 0 and not calls
+    assert result.exit_code != 0 and not any(call[0] == "POST" for call in calls)
 
 
 def test_send_model_transport(monkeypatch):

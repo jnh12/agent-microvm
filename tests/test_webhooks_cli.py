@@ -5,6 +5,55 @@ from agent_sandbox.cli.main import app
 from typer.testing import CliRunner
 
 
+def test_update_and_test_delivery(calls, monkeypatch, tmp_path):
+    result = CliRunner().invoke(
+        app,
+        ["webhook", "update", "tickets", "--profile", "support", "--concurrency", "2", "--json"],
+    )
+    assert result.exit_code == 0, result.output
+    assert calls[-1] == ("PATCH", "/v1/webhooks/h1", {"profile": "support", "concurrency": 2})
+    seen = []
+
+    def trigger(self, method, path, **kwargs):
+        seen.append((method, path, kwargs))
+        return {"id": "job", "status": "queued"}
+
+    monkeypatch.setattr("agent_sandbox.accounts.AccountClient.request", trigger)
+    payload = tmp_path / "input.json"
+    payload.write_text('{"ticket":123}', encoding="utf-8")
+    result = CliRunner().invoke(
+        app,
+        [
+            "webhook",
+            "test",
+            "tickets",
+            "--secret-file",
+            "-",
+            "--request-key",
+            "test-1",
+            "--prompt",
+            "Check ticket",
+            "--input-file",
+            str(payload),
+            "--json",
+        ],
+        input="private-secret\n",
+    )
+    assert result.exit_code == 0, result.output
+    assert "private-secret" not in result.output
+    assert seen == [
+        (
+            "POST",
+            "/v1/webhooks/h1/trigger",
+            {
+                "token": "private-secret",
+                "body": {"prompt": "Check ticket", "input": {"ticket": 123}},
+                "request_key": "test-1",
+            },
+        )
+    ]
+
+
 @pytest.fixture
 def calls(monkeypatch):
     monkeypatch.setenv("VMNEST_MODE", "hosted")
@@ -13,6 +62,8 @@ def calls(monkeypatch):
 
     def request(method, path, body=None):
         seen.append((method, path, body))
+        if method == "GET" and path == "/v1/webhooks":
+            return {"items": [{"id": "h1", "name": "tickets", "enabled": True}]}
         return {"id": "hook1", "trigger_path": "/v1/webhooks/hook1/trigger", "secret": "once"}
 
     monkeypatch.setattr("agent_sandbox.cli.webhooks.api", request)
@@ -46,7 +97,8 @@ def test_webhook_commands(calls, args, method, path):
     result = CliRunner().invoke(app, ["webhook", *args, "--json"])
     assert result.exit_code == 0, result.output
     json.loads(result.output)
-    assert calls == [(method, path, None)]
+    prefix = [("GET", "/v1/webhooks", None)] if args[0] in ("rotate", "revoke", "runs") else []
+    assert calls == prefix + [(method, path, None)]
 
 
 def test_webhooks_are_hosted_only(calls, monkeypatch):
@@ -110,3 +162,32 @@ def test_profile_rejects_conflicting_instructions_before_network(monkeypatch):
         ],
     )
     assert result.exit_code == 1 and json.loads(result.output)["error"]["code"] == "INVALID_REQUEST"
+
+
+@pytest.mark.parametrize("command", ["rotate", "revoke", "runs"])
+def test_webhook_names_resolve(calls, command):
+    result = CliRunner().invoke(app, ["webhook", command, "tickets", "--json"])
+    assert result.exit_code == 0, result.output
+    assert calls[-1][1].startswith("/v1/webhooks/h1")
+
+
+def test_revoked_name_cannot_rotate(monkeypatch):
+    seen = []
+
+    def request(method, path, body=None):
+        seen.append(method)
+        return {"items": [{"id": "h1", "name": "test", "enabled": False}]}
+
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setattr("agent_sandbox.cli.webhooks.api", request)
+    result = CliRunner().invoke(app, ["webhook", "rotate", "test", "--json"])
+    assert result.exit_code != 0
+    assert json.loads(result.output)["error"]["code"] == "WEBHOOK_REVOKED"
+    assert seen == ["GET"]
+
+
+def test_unknown_webhook_name(calls):
+    result = CliRunner().invoke(app, ["webhook", "rotate", "missing", "--json"])
+    assert result.exit_code != 0
+    assert json.loads(result.output)["error"]["code"] == "WEBHOOK_NOT_FOUND"
+    assert calls == [("GET", "/v1/webhooks", None)]

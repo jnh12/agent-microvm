@@ -13,7 +13,23 @@ uses that account connection; credentials are not copied into the profile.
 ```sh
 vmnest agent profile create support --provider codex --integration github --instructions-file support.txt --timeout 1800 --json
 vmnest webhook create support-tickets --profile support --concurrency 1 --json
+vmnest webhook update support-tickets --profile support --concurrency 2 --json
 ```
+
+The website's Webhooks page supports the same configuration, secret rotation,
+revocation, recent runs and a test delivery form. Test deliveries start real
+disposable computers and consume normal quota. Existing secrets cannot be read
+back; paste your saved secret or explicitly replace it.
+
+To test from the CLI without exposing the secret in command arguments:
+
+```sh
+vmnest webhook test support-tickets --secret-file webhook-secret.txt --request-key test-001 --prompt "Run this test task" --input-file input.json --json
+```
+
+`--secret-file -` reads stdin. Reuse the delivery key after a timeout to avoid
+creating a duplicate computer. Use a new key for a new task. Updating a webhook
+does not change profile snapshots already captured by accepted deliveries.
 
 Profiles can also supply a public repository, a startup script, and environment
 keys, for both normal computers and webhook jobs:

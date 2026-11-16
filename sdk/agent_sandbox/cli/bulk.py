@@ -23,6 +23,8 @@ def create_many(names, body, parallel, as_json, request):
         item = {"name": name, "request_key": key}
         try:
             result = request("POST", "/v1/vms", {**body, "name": name, "request_key": key})
+            if not isinstance(result, dict):
+                raise SandboxError("Invalid backend response; operation may have completed.")
             return {**item, "ok": True, "result": {**result, "request_key": key}}
         except (SandboxError, AccountError) as exc:
             return {**item, "ok": False, "error": str(exc)}
@@ -84,7 +86,10 @@ def lifecycle(action, names, all_computers, parallel, dry_run, as_json, request,
         endpoint = "open" if action == "wake" else action
         path += "?permanent=true" if action == "delete" else "/" + endpoint
         try:
-            return {"name": name, "ok": True, "result": request(method, path)}
+            result = request(method, path)
+            if not isinstance(result, dict):
+                raise SandboxError("Invalid backend response; operation may have completed.")
+            return {"name": name, "ok": True, "result": result}
         except (SandboxError, AccountError) as exc:
             return {"name": name, "ok": False, "error": str(exc)}
 

@@ -170,3 +170,63 @@ def test_bulk_create_invalid_name_no_mutations(monkeypatch):
     monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
     result = CliRunner().invoke(app, ["create", "valid", "bad/name", "--agent", "codex"])
     assert result.exit_code == 2, result.output
+
+
+@pytest.mark.parametrize("response", [None, [], "accepted", 42, True])
+@pytest.mark.parametrize("as_json", [False, True])
+@pytest.mark.parametrize("command", ["create", "wake", "shutdown", "delete"])
+def test_malformed_item_response_preserves_batch_outcomes(monkeypatch, command, as_json, response):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_API_URL", "http://127.0.0.1:8767")
+    calls = []
+
+    def request(method, path, body=None):
+        name = body["name"] if body else path.split("/")[3].split("?")[0]
+        calls.append(name)
+        if name == "bad":
+            return response
+        return {"name": name, "status": "preparing"}
+
+    monkeypatch.setattr("agent_sandbox.cli.remote.request", request)
+    monkeypatch.setattr("agent_sandbox.cli.computers.request", request)
+    args = [command, "one", "bad", "two", "--parallel", "1"]
+    if command == "create":
+        args += ["--agent", "codex", "--request-key", "batch-one"]
+    if as_json:
+        args.append("--json")
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 1, result.output
+    assert calls == ["one", "bad", "two"]
+    error = "Invalid backend response; operation may have completed."
+    if as_json:
+        summary = json.loads(result.output)
+        assert summary["ok"] is False
+        assert summary["succeeded"] == 2
+        assert summary["failed"] == 1
+        assert [item["name"] for item in summary["items"]] == ["one", "bad", "two"]
+        assert [item["ok"] for item in summary["items"]] == [True, False, True]
+        assert summary["items"][1]["error"] == error
+        if command == "create":
+            assert summary["request_key"] == "batch-one"
+            assert summary["items"][1]["request_key"].startswith("batch-")
+    else:
+        assert f"bad: {error}" in result.output
+        verb = "accepted" if command == "create" else "succeeded"
+        assert f"2 {verb}; 1 failed." in result.output
+
+
+@pytest.mark.parametrize("command", ["wake", "shutdown", "delete"])
+def test_single_malformed_response_reports_json_failure(monkeypatch, calls, command):
+    monkeypatch.setattr("agent_sandbox.cli.computers.request", lambda *args: None)
+    result = CliRunner().invoke(app, [command, "one", "--json"])
+    assert result.exit_code == 1, result.output
+    summary = json.loads(result.output)
+    assert summary["ok"] is False
+    assert summary["succeeded"] == 0 and summary["failed"] == 1
+    assert summary["items"] == [
+        {
+            "name": "one",
+            "ok": False,
+            "error": "Invalid backend response; operation may have completed.",
+        }
+    ]

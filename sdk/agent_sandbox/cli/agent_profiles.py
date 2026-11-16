@@ -12,7 +12,9 @@ import typer
 from agent_sandbox.accounts import AccountClient, AccountError, service_url
 from agent_sandbox.cli.accounts import handled
 
-app = typer.Typer(name="profile", help="Manage account-owned agent integration profiles.")
+app = typer.Typer(
+    name="profile", help="Manage reusable agent profiles, startup scripts, repositories and keys."
+)
 
 
 def workflow(instructions, instructions_file, setup_command, timeout):
@@ -32,6 +34,47 @@ def workflow(instructions, instructions_file, setup_command, timeout):
         }.items()
         if value is not None
     }
+
+
+def launch_settings(
+    repository, setup_file, env_file, unset_keys, clear_repo, clear_setup, setup_command
+):
+    from .cloud_defaults import read_input
+
+    if (setup_file and setup_command is not None) or (
+        clear_setup and (setup_file or setup_command is not None)
+    ):
+        raise AccountError("INVALID_REQUEST", "Choose --setup, --setup-file, or --clear-setup.")
+    if clear_repo and repository is not None:
+        raise AccountError("INVALID_REQUEST", "Choose --repo or --clear-repo.")
+    result = {}
+    if repository is not None or clear_repo:
+        result["repository"] = None if clear_repo else repository
+    if setup_file:
+        result["setup_command"] = read_input(setup_file, 32000).replace("\r\n", "\n")
+    elif clear_setup:
+        result["setup_command"] = None
+    variables = {}
+    if env_file:
+        try:
+            variables = json.loads(read_input(env_file, 65536))
+            if not isinstance(variables, dict) or any(
+                not isinstance(k, str) or (v is not None and not isinstance(v, str))
+                for k, v in variables.items()
+            ):
+                raise ValueError()
+        except (ValueError, TypeError):
+            raise AccountError(
+                "INVALID_REQUEST",
+                "Environment file must be a JSON object of key/value strings; null removes a key.",
+            ) from None
+    for key in unset_keys or []:
+        if key in variables:
+            raise AccountError("INVALID_REQUEST", "Do not set and remove the same key.")
+        variables[key] = None
+    if variables:
+        result["variables"] = variables
+    return result
 
 
 def api(method, path, body=None):
@@ -135,6 +178,25 @@ def create(
     name: str | None = typer.Argument(None),
     instructions: str | None = typer.Option(None, "--instructions"),
     instructions_file: str | None = typer.Option(None, "--instructions-file"),
+    repository: str | None = typer.Option(
+        None, "--repo", help="Public HTTPS Git repository. Private repositories are not supported."
+    ),
+    setup_file: str | None = typer.Option(
+        None, "--setup-file", help="UTF-8 startup script path, or - for stdin. Runs after cloning."
+    ),
+    env_file: str | None = typer.Option(
+        None,
+        "--env-file",
+        help=(
+            "JSON key/value file, or - for stdin. "
+            "Profile keys override account defaults; values remain hidden."
+        ),
+    ),
+    unset_keys: list[str] | None = typer.Option(
+        None, "--unset-key", help="Remove a profile key override. Repeat for multiple keys."
+    ),
+    clear_repo: bool = typer.Option(False, "--clear-repo", help="Remove the saved repository."),
+    clear_setup: bool = typer.Option(False, "--clear-setup", help="Remove the startup script."),
     setup_command: str | None = typer.Option(None, "--setup"),
     timeout: int | None = typer.Option(
         None,
@@ -167,6 +229,13 @@ def create(
             "hyphens or underscores (max 63 characters).",
         )
     settings = workflow(instructions, instructions_file, setup_command, timeout)
+    if setup_file == "-" and env_file == "-":
+        raise AccountError("INVALID_REQUEST", "Only one input can read stdin.")
+    settings.update(
+        launch_settings(
+            repository, setup_file, env_file, unset_keys, clear_repo, clear_setup, setup_command
+        )
+    )
     selected = select(integration, all_integrations, no_integrations, as_json, provider)
     from .agent_models import choose
 
@@ -194,6 +263,25 @@ def update(
     name: str,
     instructions: str | None = typer.Option(None, "--instructions"),
     instructions_file: str | None = typer.Option(None, "--instructions-file"),
+    repository: str | None = typer.Option(
+        None, "--repo", help="Public HTTPS Git repository. Private repositories are not supported."
+    ),
+    setup_file: str | None = typer.Option(
+        None, "--setup-file", help="UTF-8 startup script path, or - for stdin. Runs after cloning."
+    ),
+    env_file: str | None = typer.Option(
+        None,
+        "--env-file",
+        help=(
+            "JSON key/value file, or - for stdin. "
+            "Profile keys override account defaults; values remain hidden."
+        ),
+    ),
+    unset_keys: list[str] | None = typer.Option(
+        None, "--unset-key", help="Remove a profile key override. Repeat for multiple keys."
+    ),
+    clear_repo: bool = typer.Option(False, "--clear-repo", help="Remove the saved repository."),
+    clear_setup: bool = typer.Option(False, "--clear-setup", help="Remove the startup script."),
     setup_command: str | None = typer.Option(None, "--setup", help="Empty string clears setup."),
     timeout: int | None = typer.Option(None, "--timeout", min=60, max=3600),
     effort: str | None = typer.Option(None, "--effort"),
@@ -206,6 +294,13 @@ def update(
     as_json: bool = typer.Option(False, "--json"),
 ):
     settings = workflow(instructions, instructions_file, setup_command, timeout)
+    if setup_file == "-" and env_file == "-":
+        raise AccountError("INVALID_REQUEST", "Only one input can read stdin.")
+    settings.update(
+        launch_settings(
+            repository, setup_file, env_file, unset_keys, clear_repo, clear_setup, setup_command
+        )
+    )
     saved = api("GET", "/v1/agent-profiles/" + quote(name, safe=""))
     provider = saved["provider"]
     from .agent_models import choose
@@ -247,3 +342,29 @@ def inspect(name: str, as_json: bool = typer.Option(False, "--json")):
 @handled
 def delete(name: str, as_json: bool = typer.Option(False, "--json")):
     emit(api("DELETE", "/v1/agent-profiles/" + quote(name, safe="")), as_json)
+
+
+@app.command("set-key")
+@handled
+def set_key(
+    name: str,
+    key: str,
+    filename: str | None = typer.Option(
+        None, "--file", help="Read the secret from a UTF-8 file, or - for stdin."
+    ),
+    as_json: bool = typer.Option(False, "--json"),
+):
+    """Save a profile key without exposing its value in command arguments or output."""
+    from .agent_models import interactive_terminal
+    from .cloud_defaults import read_input
+
+    if filename:
+        value = read_input(filename, 4096)
+    elif as_json or not interactive_terminal():
+        raise AccountError("VALUE_REQUIRED", "Use --file PATH or --file - to read stdin.")
+    else:
+        value = typer.prompt("Value", hide_input=True)
+    emit(
+        api("PATCH", "/v1/agent-profiles/" + quote(name, safe=""), {"variables": {key: value}}),
+        as_json,
+    )

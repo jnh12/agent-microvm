@@ -7,6 +7,60 @@ from agent_sandbox.cli.agent_profiles import select
 from typer.testing import CliRunner
 
 
+def test_profile_launch_options_and_clearing(api, tmp_path):
+    script = tmp_path / "startup.sh"
+    script.write_text("echo ready\necho done", encoding="utf-8")
+    env = tmp_path / "env.json"
+    env.write_text('{"TOKEN":"secret-value"}', encoding="utf-8")
+    runner = CliRunner()
+    response = runner.invoke(
+        app,
+        [
+            "profile",
+            "create",
+            "dev",
+            "--no-integrations",
+            "--json",
+            "--repo",
+            "https://github.com/example/public",
+            "--setup-file",
+            str(script),
+            "--env-file",
+            str(env),
+        ],
+    )
+    assert response.exit_code == 0, response.output
+    assert api[-1][2]["setup_command"] == "echo ready\necho done"
+    assert api[-1][2]["variables"] == {"TOKEN": "secret-value"}
+    assert api[-1][2]["repository"] == "https://github.com/example/public"
+    response = runner.invoke(
+        app,
+        [
+            "profile",
+            "update",
+            "dev",
+            "--clear-repo",
+            "--clear-setup",
+            "--unset-key",
+            "TOKEN",
+            "--json",
+        ],
+    )
+    assert response.exit_code == 0, response.output
+    assert api[-1][2] == {"repository": None, "setup_command": None, "variables": {"TOKEN": None}}
+
+
+def test_profile_secret_input_rejects_bad_json_without_echo(api):
+    response = CliRunner().invoke(
+        app,
+        ["profile", "update", "dev", "--env-file", "-", "--json"],
+        input='{"TOKEN":["do-not-echo"]}',
+    )
+    assert response.exit_code == 1
+    assert "do-not-echo" not in response.output
+    assert not api
+
+
 @pytest.fixture
 def api(monkeypatch):
     calls = []

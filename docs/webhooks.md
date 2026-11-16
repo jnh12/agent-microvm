@@ -15,6 +15,28 @@ vmnest agent profile create support --provider codex --integration github --inst
 vmnest webhook create support-tickets --profile support --concurrency 1 --json
 ```
 
+Profiles can also supply a public repository, a startup script, and environment
+keys, for both normal computers and webhook jobs:
+
+```sh
+vmnest agent profile update support --repo https://github.com/example/public-repo --setup-file startup.sh --env-file keys.json --json
+vmnest agent profile set-key support API_KEY
+vmnest agent profile set-key support API_KEY --file - --json
+vmnest agent profile update support --unset-key API_KEY --clear-repo --clear-setup --json
+```
+
+**Repositories must be public HTTPS Git URLs.** Private repositories and embedded
+credentials are not supported. The startup script runs once after cloning,
+in `/workspace/project` (or `/workspace` without a repo), and accepts up to
+32,000 characters. Account startup scripts run before cloning.
+
+`keys.json` is a JSON object mapping names to string values. Profile keys override
+matching account defaults. Saved values are encrypted and hidden from reads;
+`inspect --json` returns their names only. `--env-file -` or `--setup-file -` reads
+stdin. `set-key` prompts secretly by default; `--file -` supports automated input.
+Removing a profile key restores any account default for that name. Profile edits
+apply to new computers; accepted webhook jobs retain their captured settings.
+
 Example `support.txt`:
 
 ```text

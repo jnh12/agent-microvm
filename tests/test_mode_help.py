@@ -8,11 +8,15 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
+def plain(value):
+    return re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", value)
+
+
 def help_text(monkeypatch, selected, *args):
     monkeypatch.setenv("VMNEST_MODE", selected)
     result = runner.invoke(app, [*args, "--help"], color=False)
-    assert result.exit_code == 0, result.output
-    return result.output
+    assert result.exit_code == 0, plain(result.output)
+    return plain(result.output)
 
 
 def test_root_switches_without_mutation(monkeypatch):
@@ -69,11 +73,11 @@ def test_saved_mode_and_offline_help(monkeypatch):
     monkeypatch.setattr("agent_sandbox.accounts.secret", forbidden)
     for args in ([], ["create"], ["agent", "send"], ["project", "logs"]):
         result = runner.invoke(app, [*args, "--help"])
-        assert result.exit_code == 0, result.output
+        assert result.exit_code == 0, plain(result.output)
     config_path().unlink()
     result = runner.invoke(app, ["--help"])
-    assert "Mode: hosted" in result.output
-    assert " infra " not in result.output and " agent " in result.output
+    assert "Mode: hosted" in plain(result.output)
+    assert " infra " not in plain(result.output) and " agent " in plain(result.output)
 
 
 @pytest.mark.parametrize(
@@ -84,7 +88,7 @@ def test_mode_errors(monkeypatch, selected, command):
     monkeypatch.setenv("VMNEST_MODE", selected)
     result = runner.invoke(app, [command, "--help"])
     assert result.exit_code != 0
-    assert "vmnest setup --mode" in result.output
+    assert "vmnest setup --mode" in plain(result.output)
 
 
 def test_environment_override(monkeypatch):

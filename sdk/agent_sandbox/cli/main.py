@@ -201,7 +201,7 @@ def create(
         None, "--setup", help="Saved shell command to prepare each fresh or restored VM."
     ),
     approvals: bool = typer.Option(
-        False, "--approvals", help="Require provider approval prompts for hosted agent actions."
+        False, "--approvals", hidden=True, help="Deprecated; hosted agents run without approval prompts."
     ),
     disposable: bool = typer.Option(
         False,

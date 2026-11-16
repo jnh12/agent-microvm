@@ -15,6 +15,16 @@ app = typer.Typer(
 )
 
 
+def validate_request_key(value):
+    """Reject missing or invalid HTTP header values without changing retry identity."""
+    if not value or value != value.strip() or any(not 32 <= ord(c) <= 126 for c in value):
+        raise AccountError(
+            "INVALID_REQUEST",
+            "Supply a nonempty --request-key using printable ASCII without surrounding whitespace. "
+            "Reuse the exact same key and input when retrying a delivery.",
+        )
+
+
 def path(identifier, suffix="", *, run=False):
     return ("/v1/webhook-runs/" if run else "/v1/webhooks/") + quote(identifier, safe="") + suffix
 
@@ -166,6 +176,7 @@ def test_delivery(
 
     from .cloud_defaults import read_input
 
+    validate_request_key(request_key)
     if input_file == "-" and secret_file == "-":
         raise AccountError("INVALID_REQUEST", "Only one input can read stdin.")
     try:

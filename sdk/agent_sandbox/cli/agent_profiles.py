@@ -178,6 +178,10 @@ def create(
     name: str | None = typer.Argument(None),
     instructions: str | None = typer.Option(None, "--instructions"),
     instructions_file: str | None = typer.Option(None, "--instructions-file"),
+    endpoint: list[str] | None = typer.Option(
+        None, "--endpoint", help="Event endpoint name or ID. Repeat for multiple."
+    ),
+    clear_endpoints: bool = typer.Option(False, "--clear-endpoints"),
     repository: str | None = typer.Option(
         None, "--repo", help="Public HTTPS Git repository. Private repositories are not supported."
     ),
@@ -229,6 +233,13 @@ def create(
             "hyphens or underscores (max 63 characters).",
         )
     settings = workflow(instructions, instructions_file, setup_command, timeout)
+    if endpoint and clear_endpoints:
+        raise AccountError("INVALID_REQUEST", "Choose --endpoint or --clear-endpoints.")
+    if endpoint or clear_endpoints:
+        from .event_endpoints import resolve
+
+        settings["event_endpoints"] = [resolve(i)["id"] for i in endpoint or []]
+
     if setup_file == "-" and env_file == "-":
         raise AccountError("INVALID_REQUEST", "Only one input can read stdin.")
     settings.update(
@@ -263,6 +274,10 @@ def update(
     name: str,
     instructions: str | None = typer.Option(None, "--instructions"),
     instructions_file: str | None = typer.Option(None, "--instructions-file"),
+    endpoint: list[str] | None = typer.Option(
+        None, "--endpoint", help="Event endpoint name or ID. Repeat for multiple."
+    ),
+    clear_endpoints: bool = typer.Option(False, "--clear-endpoints"),
     repository: str | None = typer.Option(
         None, "--repo", help="Public HTTPS Git repository. Private repositories are not supported."
     ),
@@ -294,6 +309,13 @@ def update(
     as_json: bool = typer.Option(False, "--json"),
 ):
     settings = workflow(instructions, instructions_file, setup_command, timeout)
+    if endpoint and clear_endpoints:
+        raise AccountError("INVALID_REQUEST", "Choose --endpoint or --clear-endpoints.")
+    if endpoint or clear_endpoints:
+        from .event_endpoints import resolve
+
+        settings["event_endpoints"] = [resolve(i)["id"] for i in endpoint or []]
+
     if setup_file == "-" and env_file == "-":
         raise AccountError("INVALID_REQUEST", "Only one input can read stdin.")
     settings.update(

@@ -199,6 +199,10 @@ class AccountClient:
                         "A selected integration is unavailable. Check vmnest agent integrations."
                     ),
                     "PROFILE_NOT_FOUND": "Agent profile not found.",
+                    "ENDPOINT_NOT_FOUND": "Event endpoint not found.",
+                    "ENDPOINT_EXISTS": "An event endpoint already uses this name.",
+                    "ENDPOINT_DISABLED": "Enable the event endpoint before sending a test.",
+                    "ENDPOINT_LIMIT": "At most 20 event endpoints are allowed per account.",
                     "PROFILE_EXISTS": "Agent profile exists. Use profile update.",
                     "CONNECTION_EXISTS": (
                         "A connection is already saved. Use --replace to explicitly replace it."

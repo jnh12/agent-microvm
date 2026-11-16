@@ -199,6 +199,9 @@ class AccountClient:
                         "A selected integration is unavailable. Check vmnest agent integrations."
                     ),
                     "PROFILE_NOT_FOUND": "Agent profile not found.",
+                    "WEBHOOK_ACTION_FORBIDDEN": "This action is not enabled for this webhook.",
+                    "WEBHOOK_LIMIT": "At most 50 active machine webhooks are allowed.",
+                    "WEBHOOK_TIMEOUT": "Delivery timed out before dispatch.",
                     "ENDPOINT_NOT_FOUND": "Event endpoint not found.",
                     "ENDPOINT_EXISTS": "An event endpoint already uses this name.",
                     "ENDPOINT_DISABLED": "Enable the event endpoint before sending a test.",

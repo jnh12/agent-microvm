@@ -1,0 +1,7 @@
+# Agent work
+
+Codex and Claude provider connections are account-scoped. Discover available models and integrations through agent commands or MCP before selecting them. Provider connection, integration selection, profile, computer configuration and conversation model are different settings. Changing an account default does not prove an existing computer has refreshed it.
+
+Use agent send for automation, not a simulated interactive chat. Provide a stable request key, record run ID and session, then wait/inspect and read logs. Read paginated events with the returned cursor as after; do not continually reread the entire log. agent runs/sessions discover existing work, cancel stops a particular run, and resume-queue resumes paused queued work. Do not treat cancellation as a successful result. Handle needs-attention/approval events explicitly if returned; do not assume every provider or integration can operate unattended.
+
+Profiles capture provider/model/effort, integrations, workflow instructions, optional public repository, environment keys, startup script, timeout and event endpoint selections. `agent profile create NAME --provider codex --instructions-file instructions.txt --json` creates one; inspect before update. `create NAME --profile PROFILE --json` launches from it. A profile is a template, not a running computer. Updating it does not automatically reconfigure every existing machine. Repository setup is for PUBLIC repositories; do not put access tokens in a repository URL.

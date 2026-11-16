@@ -63,6 +63,8 @@ register_accounts(app)
 register_computers(app)
 
 register_schema(app)
+from .docs import register as register_docs
+register_docs(app)
 
 
 @app.callback()

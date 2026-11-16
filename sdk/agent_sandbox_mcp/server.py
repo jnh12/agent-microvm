@@ -28,7 +28,7 @@ logging.basicConfig(
 log = logging.getLogger("vmnest-mcp")
 
 INSTRUCTIONS = (
-    "Isolated microVM sandboxes on AWS Lambda MicroVMs. Use these tools to run "
+    "Read vmnest_guide for setup and mode-specific guidance. Isolated microVM sandboxes on AWS Lambda MicroVMs. Use these tools to run "
     "code and manage files INSIDE sandboxes instead of on the host: `sandbox_run` "
     "for one-off commands in an ephemeral VM; `sandbox_create` then `sandbox_exec`/"
     "`sandbox_shell` for persistent work; `sandbox_fs_*` for files. Image/role/region "
@@ -51,6 +51,20 @@ def build_server() -> FastMCP:
             await registry.aclose()
 
     mcp = FastMCP("vmnest", instructions=INSTRUCTIONS, lifespan=lifespan)
+    from agent_sandbox.guidance import read, TOPICS
+
+    @mcp.tool()
+    def vmnest_guide(topic: str = "guide") -> str:
+        """Read VMNest setup and operating documentation; hosted and local modes differ."""
+        return read(topic)
+
+    for topic in TOPICS:
+        def make_document(selected):
+            def document() -> str:
+                return read(selected)
+            return document
+        mcp.resource("vmnest://docs/" + topic, name="VMNest " + topic)(make_document(topic))
+
     register_all(mcp, registry, config)
     resources.register(mcp, registry, config)
     return mcp

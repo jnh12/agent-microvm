@@ -146,6 +146,7 @@ def follow(identifier, as_json=False, after=0, wait=True, timeout=300):
     deadline = time.monotonic() + wait_seconds(timeout)
     interval = poll_interval()
     renderer = EventRenderer() if not as_json else None
+    terminal_seen = False
     while True:
         page = api("GET", path + "/events?after=" + str(after))
         after = page["cursor"]
@@ -170,8 +171,12 @@ def follow(identifier, as_json=False, after=0, wait=True, timeout=300):
         remaining = deadline - time.monotonic()
         if remaining <= 0 and not stopped(result):
             result = {**result, "timed_out": True}
-        # Drain terminal event pages, but never beyond the local deadline.
-        draining = result["status"] in TERMINAL and bool(page["items"]) and remaining > 0
+        # Events are fetched before status: the first terminal observation can
+        # race an empty page. Fetch again after observing terminal status before
+        # accepting an empty page as drained, bounded by the local deadline.
+        terminal = result["status"] in TERMINAL
+        draining = terminal and (not terminal_seen or bool(page["items"])) and remaining > 0
+        terminal_seen = terminal
         if not wait or ((stopped(result) or remaining <= 0) and not draining):
             if as_json:
                 typer.echo(json.dumps({"type": "result", "run": result, "cursor": after}))

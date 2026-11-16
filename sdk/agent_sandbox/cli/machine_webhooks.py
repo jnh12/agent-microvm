@@ -96,3 +96,10 @@ def trigger(
         body={"action": action, "prompt": prompt, "input": data, "session": session},
     )
     details(r, as_json)
+
+
+@app.command("delete")
+@handled
+def delete(identifier: str, as_json: bool = typer.Option(False, "--json")):
+    """Remove a webhook and revoke access. Already-running work can finish."""
+    details(api("DELETE", ROOT + "/" + resolve(identifier)["id"] + "?permanent=true"), as_json)

@@ -60,3 +60,17 @@ def test_machine_webhook_cli(monkeypatch):
     )
     assert result.exit_code == 0, result.output
     assert "test-secret" not in result.output
+
+
+def test_both_webhook_delete_commands(monkeypatch):
+    monkeypatch.setenv('VMNEST_MODE','hosted')
+    calls=[]
+    def api(method,path,body=None):
+        calls.append((method,path))
+        return {'items':[{'id':'a'*32,'name':'control'}]} if method=='GET' else {'status':'deleted'}
+    monkeypatch.setattr('agent_sandbox.cli.webhooks.api',api)
+    monkeypatch.setattr('agent_sandbox.cli.machine_webhooks.api',api)
+    for command,root in [('webhook','webhooks'),('machine-webhook','machine-webhooks')]:
+        result=CliRunner().invoke(app,[command,'delete','control','--json'])
+        assert result.exit_code==0,result.output
+        assert calls[-1]==('DELETE','/v1/'+root+'/'+'a'*32+'?permanent=true')

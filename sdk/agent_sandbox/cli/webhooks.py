@@ -184,3 +184,10 @@ def test_delivery(
         request_key=request_key,
     )
     details(result, as_json)
+
+
+@app.command("delete")
+@handled
+def delete(identifier: str, as_json: bool = typer.Option(False, "--json")):
+    """Remove a webhook and revoke access. Already-running work can finish."""
+    details(api("DELETE", path(resolve_hook(identifier)["id"]) + "?permanent=true"), as_json)

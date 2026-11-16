@@ -5,7 +5,7 @@ description: Set up and operate VMNest cloud computers, delegate Codex or Claude
 
 # VMNest
 
-Read [the agent guide](guide.md) before first use. Prefer an already-connected hosted MCP; otherwise use the CLI. Use the installed command schema or MCP tools/list as the source of exact flags and payloads.
+Read [the agent guide](guide.md) before first use. For setup, install and verify the CLI even if hosted MCP is connected. Configure an available coding provider and reusable profile; use MCP for supported remote operations when useful. Follow the full onboarding checklist in guide.md. Use the installed command schema or MCP tools/list as the source of exact flags and payloads.
 
 - Setup: guide.md. Verify identity and capacity; setup alone does not require creating a computer.
 - Computer operations: lifecycle.md. Distinguish power, setup and agent-run state. Wait for readiness; inspect after uncertain outcomes. Shutdown and permanent deletion are different.

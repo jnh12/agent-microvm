@@ -73,3 +73,19 @@ Shutdown cancels active/queued agent work, attempts a save, and stops even when 
 ## Further reference
 
 Read the topics needed for the task: `vmnest docs lifecycle`, `agents`, `automation`, `configuration`, `mcp`, `troubleshooting`, or `commands`. `vmnest docs --json` is machine-readable. `vmnest skill` prints a portable SKILL.md; `vmnest skill --output PATH` writes a skill directory with offline references without overwriting existing files. The website publishes this guide at https://vmnest.cc/agent-guide.txt, a documentation index at /llms.txt, and the skill at /skills/vmnest/SKILL.md. MCP clients can call vmnest_guide with a topic or read vmnest://docs/guide. Exact command/tool schemas take precedence over examples when versions differ.
+
+## Browser sign-in for agent accounts
+
+Prefer browser sign-in when local provider credentials should not be uploaded:
+
+```sh
+vmnest agent login --provider codex --json
+vmnest agent login --provider claude --json
+vmnest agent login-status LOGIN_ID --json
+```
+
+Poll until a provider URL is available. Show that URL and any one-time device code to the user. They must approve the sign-in themselves. Codex completes automatically after approval. For Claude, submit the code from its browser using `vmnest agent login-complete LOGIN_ID` (hidden prompt, or stdin for automation); never put authorization codes in command arguments or logs. Poll until `completed`. Use `vmnest agent login-cancel LOGIN_ID` to cancel. Sessions expire after ten minutes and are lost if the service restarts. Use `--replace` only with explicit intent to replace an existing connection.
+
+Dashboard: Settings > Agent connections > Connect or Reconnect. Hosted MCP: `agent_login_start`, `agent_login_status`, `agent_login_complete` (Claude only), `agent_login_cancel`. MCP start takes `provider` and `body: {"replace": false}`; other calls take `identifier`, and completion also takes `body: {"code": "USER_SUPPLIED_CODE"}`.
+
+Successful sign-in stores encrypted credentials for future computers on this VMNest account; it does not automatically select integrations. Configure those separately. `vmnest agent revoke --provider codex` (or `claude`) removes VMNest's saved credentials, not the provider session or credentials already installed on existing computers. This flow runs the official provider CLI; it is not a separately registered VMNest OAuth application.

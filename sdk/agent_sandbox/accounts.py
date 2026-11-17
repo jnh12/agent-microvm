@@ -163,6 +163,10 @@ class AccountClient:
                     code = "SERVICE_ERROR"
                 # Avoid printing arbitrary provider/proxy responses or secrets.
                 messages = {
+                    "LOGIN_UNAVAILABLE": "Provider sign-in is temporarily unavailable. Try again later.",
+                    "LOGIN_LIMIT": "Too many pending sign-ins. Try again shortly.",
+                    "LOGIN_NOT_FOUND": "Sign-in expired or was lost after a restart. Start again.",
+                    "LOGIN_NOT_PENDING": "This sign-in is not waiting for an authorization code.",
                     "HOURS_EXHAUSTED": (
                         "Monthly machine-hours are used up. Upgrade at "
                         "vmnest.cc/dashboard/billing or wait for renewal."

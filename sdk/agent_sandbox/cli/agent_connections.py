@@ -270,7 +270,9 @@ def status(
         )
 
 
-@app.command('revoke', help='Remove saved VMNest agent credentials. Does not revoke the provider session.')
+@app.command(
+    "revoke", help="Remove saved VMNest agent credentials. Does not revoke the provider session."
+)
 @app.command()
 @handled
 def disconnect(
@@ -351,3 +353,85 @@ def configure(
     except AccountError as exc:
         raise configuration_error(exc, provider) from None
     typer.echo(json.dumps(result) if as_json else f"{provider} defaults saved for future VMs.")
+
+
+@app.command("login")
+@handled
+def oauth_login(
+    provider: Provider = typer.Option(..., "--provider"),
+    replace: bool = typer.Option(False, "--replace"),
+    as_json: bool = typer.Option(False, "--json"),
+):
+    """Start provider browser sign-in without reading local credentials."""
+    import time
+
+    from .agent_models import interactive_terminal
+
+    result = api("POST", f"/v1/agent-connections/{provider}/login", {"replace": replace})
+    if as_json:
+        typer.echo(json.dumps(result))
+        return
+    identifier = result["id"]
+    typer.echo(f"Sign-in session: {identifier}")
+    # Wait briefly for the native CLI to produce the browser URL, never indefinitely.
+    for _ in range(15):
+        if result["status"] != "starting":
+            break
+        time.sleep(1)
+        result = api("GET", f"/v1/agent-logins/{identifier}")
+    if result.get("verification_url"):
+        typer.echo("Open: " + result["verification_url"])
+        if interactive_terminal():
+            typer.launch(result["verification_url"])
+    if result.get("user_code"):
+        typer.echo("One-time code: " + result["user_code"])
+    if result.get("error"):
+        raise AccountError("LOGIN_FAILED", result["error"])
+    if provider == "claude":
+        typer.echo(f"After approval: vmnest agent login-complete {identifier}")
+    typer.echo(f"Check completion: vmnest agent login-status {identifier}")
+
+
+@app.command("login-status")
+@handled
+def oauth_status(identifier: str, as_json: bool = typer.Option(False, "--json")):
+    """Get sign-in status and the provider link/code when ready."""
+    from urllib.parse import quote
+
+    result = api("GET", "/v1/agent-logins/" + quote(identifier, safe=""))
+    if as_json:
+        typer.echo(json.dumps(result))
+    else:
+        typer.echo(result["status"])
+        if result.get("verification_url"):
+            typer.echo("Open: " + result["verification_url"])
+        if result.get("user_code"):
+            typer.echo("One-time code: " + result["user_code"])
+        if result.get("error"):
+            typer.echo(result["error"])
+
+
+@app.command("login-complete")
+@handled
+def oauth_complete(identifier: str, as_json: bool = typer.Option(False, "--json")):
+    """Submit a Claude authorization code from stdin, never a command argument."""
+    import sys
+    from urllib.parse import quote
+
+    code = (
+        typer.prompt("Authorization code", hide_input=True)
+        if sys.stdin.isatty()
+        else sys.stdin.read().strip()
+    )
+    result = api("POST", "/v1/agent-logins/" + quote(identifier, safe="") + "/code", {"code": code})
+    typer.echo(json.dumps(result) if as_json else result["status"])
+
+
+@app.command("login-cancel")
+@handled
+def oauth_cancel(identifier: str, as_json: bool = typer.Option(False, "--json")):
+    """Cancel a pending provider sign-in."""
+    from urllib.parse import quote
+
+    result = api("DELETE", "/v1/agent-logins/" + quote(identifier, safe=""))
+    typer.echo(json.dumps(result) if as_json else result["status"])

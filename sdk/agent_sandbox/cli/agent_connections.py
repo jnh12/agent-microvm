@@ -270,6 +270,7 @@ def status(
         )
 
 
+@app.command('revoke', help='Remove saved VMNest agent credentials. Does not revoke the provider session.')
 @app.command()
 @handled
 def disconnect(

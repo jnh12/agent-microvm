@@ -191,3 +191,75 @@ def test_unknown_webhook_name(calls):
     assert result.exit_code != 0
     assert json.loads(result.output)["error"]["code"] == "WEBHOOK_NOT_FOUND"
     assert calls == [("GET", "/v1/webhooks", None)]
+
+
+@pytest.mark.parametrize("command", ["webhook", "machine-webhook"])
+@pytest.mark.parametrize(
+    "key", ["", " ", " leading", "trailing ", "line\nbreak", "tab\tkey", "clé", "nul\x00key"]
+)
+def test_delivery_rejects_invalid_request_key_before_network(monkeypatch, command, key):
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_WEBHOOK_SECRET", "private-secret")
+    for module in ("webhooks", "machine_webhooks"):
+        monkeypatch.setattr(
+            f"agent_sandbox.cli.{module}.api", lambda *a: pytest.fail("network lookup")
+        )
+    monkeypatch.setattr(
+        "agent_sandbox.accounts.AccountClient.request", lambda *a, **kw: pytest.fail("delivery")
+    )
+    args = (
+        ["webhook", "test", "tickets", "--secret-file", "-"]
+        if command == "webhook"
+        else ["machine-webhook", "trigger", "tickets"]
+    )
+    result = CliRunner().invoke(app, [*args, "--request-key", key, "--json"])
+    assert result.exit_code == 1, result.output
+    error = json.loads(result.output)["error"]
+    assert error["code"] == "INVALID_REQUEST"
+    assert "--request-key" in error["message"]
+    assert "private-secret" not in result.output
+
+
+@pytest.mark.parametrize("command", ["webhook", "machine-webhook"])
+@pytest.mark.parametrize("key", ["ticket-42:v1/a+b=", "ticket 42"])
+def test_delivery_retry_preserves_key_and_input(monkeypatch, command, key):
+    import httpx
+
+    monkeypatch.setenv("VMNEST_MODE", "hosted")
+    monkeypatch.setenv("VMNEST_WEBHOOK_SECRET", "private-secret")
+    for module in ("webhooks", "machine_webhooks"):
+        monkeypatch.setattr(
+            f"agent_sandbox.cli.{module}.api",
+            lambda *a: {"items": [{"id": "h1", "name": "tickets"}]},
+        )
+        monkeypatch.setattr(f"agent_sandbox.cli.{module}.service_url", lambda: "https://api.test")
+    seen = []
+
+    def send(request):
+        seen.append(request)
+        return httpx.Response(200, json={"id": "delivery", "status": "queued"})
+
+    client = httpx.Client
+    monkeypatch.setattr(
+        httpx, "Client", lambda **kwargs: client(**kwargs, transport=httpx.MockTransport(send))
+    )
+    args = (
+        ["webhook", "test", "tickets", "--secret-file", "-"]
+        if command == "webhook"
+        else ["machine-webhook", "trigger", "tickets"]
+    )
+    for _ in range(2):
+        result = CliRunner().invoke(
+            app,
+            [*args, "--request-key", key, "--prompt", "Review ticket", "--json"],
+            input="private-secret\n",
+        )
+        assert result.exit_code == 0, result.output
+        assert "private-secret" not in result.output
+    assert len(seen) == 2
+    assert seen[0].url == seen[1].url
+    assert seen[0].content == seen[1].content
+    for request in seen:
+        assert request.headers["Idempotency-Key"] == key
+        assert request.headers["Authorization"] == "Bearer private-secret"
+        assert json.loads(request.content)["prompt"] == "Review ticket"

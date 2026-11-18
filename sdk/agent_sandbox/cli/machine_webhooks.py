@@ -2,11 +2,15 @@
 
 import json
 import os
+
 import typer
+
 from agent_sandbox.accounts import AccountClient, AccountError, service_url
+
 from .accounts import handled
 from .agent_profiles import api
 from .output import details
+from .webhooks import validate_request_key
 
 app = typer.Typer(
     name="machine-webhook", help="Manage webhooks for existing computers.", no_args_is_help=True
@@ -78,6 +82,7 @@ def trigger(
     as_json: bool = typer.Option(False, "--json"),
 ):
     """Send a real delivery. Read the webhook secret from an environment variable."""
+    validate_request_key(request_key)
     token = os.getenv(secret_env, "")
     if not token:
         raise AccountError("INVALID_REQUEST", "Set the webhook secret environment variable first.")

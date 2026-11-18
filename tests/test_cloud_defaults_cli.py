@@ -152,3 +152,33 @@ def test_interactive_prompt_hides_value(calls, monkeypatch):
     result = runner.invoke(app, ["defaults", "set", "API_KEY"])
     assert result.exit_code == 0, result.output
     assert "private-secret" not in result.output
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("private-secret\r", "private-secret\r"),
+        ("private-secret\r\r\n", "private-secret\r"),
+        ("private-secret\n\n", "private-secret\n"),
+        ("private-secret\r\n", "private-secret"),
+        ("private-secret\n", "private-secret"),
+        ("private-secret", "private-secret"),
+    ],
+)
+def test_stdin_removes_only_one_newline(calls, monkeypatch, value, expected):
+    import io
+
+    from agent_sandbox.cli import cloud_defaults
+
+    # Use an exact text stream rather than CliRunner's universal-newline stdin.
+    original_read_input = cloud_defaults.read_input
+
+    def read_input(filename, limit):
+        monkeypatch.setattr("sys.stdin", io.StringIO(value))
+        return original_read_input(filename, limit)
+
+    monkeypatch.setattr(cloud_defaults, "read_input", read_input)
+    result = runner.invoke(app, ["defaults", "set", "API_KEY", "--stdin", "--json"])
+    assert result.exit_code == 0, result.output
+    assert calls[-1][2]["variables"] == {"API_KEY": expected}
+    assert "private-secret" not in result.output

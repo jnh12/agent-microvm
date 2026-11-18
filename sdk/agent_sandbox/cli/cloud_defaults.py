@@ -63,7 +63,8 @@ def set_variable(
         raise AccountError("INVALID_REQUEST", "Choose --stdin or --file.")
     if stdin:
         value = read_input("-", 4098)
-        value = value.removesuffix("\n").removesuffix("\r")
+        if value.endswith("\n"):
+            value = value[:-1].removesuffix("\r")
     elif file is not None:
         value = read_input(file, 4096)
     else:
